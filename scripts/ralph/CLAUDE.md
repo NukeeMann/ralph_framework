@@ -70,6 +70,15 @@ Before committing, check if any edited files have learnings worth preserving in 
 
 Only update CLAUDE.md if you have **genuinely reusable knowledge** that would help future work in that directory.
 
+## Coding Philosophy (Karpathy Guidelines)
+
+Before writing any code:
+
+- **Think Before Coding** — State your assumptions explicitly. If a request has multiple valid interpretations, present them and ask. If a simpler approach exists, say so before coding the complex one.
+- **Simplicity First** — Write the minimum code that satisfies the story's acceptance criteria. No speculative abstractions, no unrequested configurability, no "while I'm here" improvements.
+- **Surgical Changes** — Only modify lines that directly address the current story. Match existing code style. Never clean up or refactor code adjacent to your change unless it was orphaned by your change.
+- **Goal-Driven Execution** — For bug fixes, write a test that reproduces the bug before fixing it. For multi-step stories, state a plan with explicit verification steps and confirm before executing.
+
 ## Quality Requirements
 
 - ALL commits must pass your project's quality checks (typecheck, lint, test)

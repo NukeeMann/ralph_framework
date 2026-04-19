@@ -89,6 +89,7 @@ Each story should be small enough to implement in one focused session.
 **Important:** 
 - Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
 - **For any story with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
+- **For any bug fix story:** The first criterion must be "A test reproducing the bug exists and fails before the fix." This enforces goal-driven execution — the fix is complete only when that test passes.
 
 ### 4. Functional Requirements
 Numbered list of specific functionalities:
