@@ -27,8 +27,9 @@ echo "Installing Ralph Framework into: $TARGET"
 echo ""
 
 # Create directory structure
-mkdir -p "$RALPH_DST/skills/convert"
-mkdir -p "$RALPH_DST/skills/create"
+mkdir -p "$RALPH_DST/skills/prd_init"
+mkdir -p "$RALPH_DST/skills/prd_append"
+mkdir -p "$RALPH_DST/skills/karpathy-guidelines"
 mkdir -p "$RALPH_DST/logs"
 mkdir -p "$RALPH_DST/archive"
 
@@ -46,8 +47,9 @@ else
 fi
 
 # Copy skills
-cp "$RALPH_SRC/skills/convert/SKILL.md" "$RALPH_DST/skills/convert/SKILL.md"
-cp "$RALPH_SRC/skills/create/SKILL.md" "$RALPH_DST/skills/create/SKILL.md"
+cp "$RALPH_SRC/skills/prd_init/SKILL.md" "$RALPH_DST/skills/prd_init/SKILL.md"
+cp "$RALPH_SRC/skills/prd_append/SKILL.md" "$RALPH_DST/skills/prd_append/SKILL.md"
+cp "$RALPH_SRC/skills/karpathy-guidelines/SKILL.md" "$RALPH_DST/skills/karpathy-guidelines/SKILL.md"
 
 # Make scripts executable
 chmod +x "$RALPH_DST/ralph.sh"
@@ -96,7 +98,7 @@ echo "Ralph Framework installed successfully!"
 echo ""
 echo "Next steps:"
 echo "  1. Edit scripts/ralph/ralph.config to configure PRD location & stories field"
-echo "  2. Create a PRD: use the 'create' skill or write tasks/prd-feature.md manually"
-echo "  3. Convert PRD to prd.json: use the 'convert' skill"
+echo "  2. New project: use the 'prd_init' skill in Claude Code"
+echo "  3. Mid-project bugs/features: use the 'prd_append' skill in Claude Code"
 echo "  4. Run single iteration:  ./scripts/ralph/ralph.sh --tool claude"
 echo "  5. Run parallel orchestrator: ./scripts/ralph/run_ralph.sh --parallel 2 --tool claude"
