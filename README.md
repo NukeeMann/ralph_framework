@@ -6,13 +6,13 @@ Ralph reads a PRD with prioritized user stories, picks one story per iteration, 
 
 ## How It Works
 
-1. You write a PRD describing your feature as user stories
-2. Convert it to `prd.json` (Ralph's structured format)
-3. Ralph picks the highest-priority incomplete story
-4. Spawns a fresh AI agent (Claude Code or Amp) to implement it
-5. Agent commits changes, logs progress, and exits
-6. Ralph picks the next story and repeats
-7. Parallel mode runs multiple stories simultaneously in git worktrees
+1. Use the `prd_init` skill in Claude Code — it asks up to 10 clarifying questions and writes `prd.json` directly
+2. Ralph picks the highest-priority incomplete story
+3. Spawns a fresh AI agent (Claude Code or Amp) to implement it
+4. Agent commits changes, logs progress, and exits
+5. Ralph picks the next story and repeats
+6. Parallel mode runs multiple stories simultaneously in git worktrees
+7. Mid-project: use `prd_append` to triage bugs and new features into the existing `prd.json`
 
 ## Quick Start
 
@@ -23,26 +23,17 @@ Ralph reads a PRD with prioritized user stories, picks one story per iteration, 
 ./init.sh /path/to/your/project
 ```
 
-This copies all ralph scripts into `your-project/scripts/ralph/`.
-
-### Configure
-
-Edit `scripts/ralph/ralph.config`:
-
-```bash
-# Put prd.json in repo root instead of scripts/ralph/
-PRD_DIR="$REPO_ROOT"
-
-# If your PRD uses "userStories" instead of "stories"
-STORIES_FIELD="userStories"
-
-# For non-npm projects
-INSTALL_CMD="pip install -r requirements.txt"
-```
+This copies all ralph scripts and skills into `your-project/scripts/ralph/`.
 
 ### Create a PRD
 
-Use the built-in skill or write one manually, then convert to `prd.json`:
+Open Claude Code in your project and type:
+
+> "Chcę zbudować aplikację X" / "I want to build X"
+
+The `prd_init` skill will ask up to 10 clarifying questions (problem, users, stack, auth, scope, success metrics, etc.), show you the proposed stories for review, and write `prd.json` directly — no intermediate markdown file.
+
+**`prd.json` format:**
 
 ```json
 {
@@ -61,6 +52,21 @@ Use the built-in skill or write one manually, then convert to `prd.json`:
     }
   ]
 }
+```
+
+### Configure (optional)
+
+Edit `scripts/ralph/ralph.config`:
+
+```bash
+# Put prd.json in repo root instead of scripts/ralph/
+PRD_DIR="$REPO_ROOT"
+
+# If your PRD uses "userStories" instead of "stories"
+STORIES_FIELD="userStories"
+
+# For non-npm projects
+INSTALL_CMD="pip install -r requirements.txt"
 ```
 
 ### Run
@@ -103,27 +109,42 @@ Use the built-in skill or write one manually, then convert to `prd.json`:
 
 ## Skills
 
-### PRD Create (`skills/create/SKILL.md`)
-Generates a structured PRD markdown file from a feature description. Asks clarifying questions, then outputs to `tasks/prd-[feature].md`.
+Skills are invoked in Claude Code via slash commands or by describing what you need.
 
-### PRD Convert (`skills/convert/SKILL.md`)
-Converts a PRD markdown file into the `prd.json` format Ralph needs. Handles story sizing, dependency ordering, and acceptance criteria.
+### `prd_init`
+**Trigger:** "chcę zbudować", "new project", "create prd", "zaplanuj projekt"
+
+New project from scratch. Asks up to 10 clarifying questions (problem, users, core actions, scope, stack, auth, data, integrations, success metrics, MVP vs full). Shows proposed stories for review before writing. Writes `prd.json` directly — no intermediate `.md` file. Archives previous `prd.json` if switching features.
+
+### `prd_append`
+**Trigger:** "mam bugi", "dodaj taski", "found bugs", "lista bugów", "mid-project tasks"
+
+Mid-project triage. Reads the existing `prd.json`, takes a rough list of bugs and/or new features, classifies each item (bug / feature / enhancement), asks clarifying questions per item where needed, then appends properly formatted stories. Never modifies existing stories or completed entries.
+
+- Bug stories automatically get the test-first criterion: *"A failing test reproducing the bug exists before the fix"*
+- Priorities are assigned relative to existing stories
+
+### `karpathy_guidelines`
+**Trigger:** "karpathy guidelines", "coding philosophy", "coding principles"
+
+Reference for the four behavioral principles applied to every agent iteration: Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution. These are already embedded in `CLAUDE.md` — use this skill for detailed reference or discussion.
 
 ## Directory Structure
 
 ```
 scripts/ralph/
-  ralph.sh          # Single iteration runner
-  run_ralph.sh      # Parallel orchestrator
-  CLAUDE.md         # Agent instructions (read by each iteration)
-  ralph.config      # Configuration overrides
-  prd.json          # Your project's PRD (generated, not committed)
-  progress.txt      # Cumulative progress log (generated)
-  logs/             # Per-task execution logs
-  archive/          # Archived previous runs
+  ralph.sh            # Single iteration runner
+  run_ralph.sh        # Parallel orchestrator
+  CLAUDE.md           # Agent instructions (read by each iteration)
+  ralph.config        # Configuration overrides
+  prd.json            # Your project's PRD (generated, not committed)
+  progress.txt        # Cumulative progress log (generated)
+  logs/               # Per-task execution logs
+  archive/            # Archived previous runs
   skills/
-    convert/SKILL.md  # PRD -> prd.json converter
-    create/SKILL.md   # PRD generator
+    prd_init/         # New project: questions → prd.json
+    prd_append/       # Mid-project: triage bugs/features → append to prd.json
+    karpathy-guidelines/  # Coding philosophy reference
 ```
 
 ## How Ralph Learns
@@ -135,4 +156,13 @@ Each iteration appends to `progress.txt` with:
 
 General patterns get consolidated into a `## Codebase Patterns` section at the top of `progress.txt`, which future iterations read first. This gives Ralph a growing understanding of your codebase across iterations.
 
-Ralph also updates `CLAUDE.md` files in directories it modifies, preserving knowledge for future work.
+Ralph also updates `CLAUDE.md` files in directories it modifies, preserving module-specific knowledge for future work.
+
+## Coding Philosophy
+
+Every spawned agent follows the Karpathy guidelines embedded in `CLAUDE.md`:
+
+- **Think Before Coding** — State assumptions, present interpretations, ask when confused
+- **Simplicity First** — Minimum code that satisfies the story, no speculative abstractions
+- **Surgical Changes** — Only modify what the story requires, match existing style
+- **Goal-Driven Execution** — Test-first for bugs, verify each acceptance criterion before committing
