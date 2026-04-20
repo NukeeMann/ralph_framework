@@ -168,7 +168,7 @@ If a bug or feature is too large, split it:
 
 **UI stories — include:**
 ```
-"Verify in browser using dev-browser skill"
+"Verify in browser using playwright-skill"
 ```
 
 ---

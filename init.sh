@@ -30,6 +30,7 @@ echo ""
 mkdir -p "$RALPH_DST/skills/prd_init"
 mkdir -p "$RALPH_DST/skills/prd_append"
 mkdir -p "$RALPH_DST/skills/karpathy-guidelines"
+mkdir -p "$RALPH_DST/skills/playwright-skill"
 mkdir -p "$RALPH_DST/logs"
 mkdir -p "$RALPH_DST/archive"
 
@@ -49,6 +50,26 @@ fi
 cp "$RALPH_SRC/skills/prd_init/SKILL.md" "$RALPH_DST/skills/prd_init/SKILL.md"
 cp "$RALPH_SRC/skills/prd_append/SKILL.md" "$RALPH_DST/skills/prd_append/SKILL.md"
 cp "$RALPH_SRC/skills/karpathy-guidelines/SKILL.md" "$RALPH_DST/skills/karpathy-guidelines/SKILL.md"
+
+# Copy playwright-skill to project (full skill from ralph repo)
+PW_SRC="$RALPH_SRC/skills/playwright-skill"
+PW_DST="$RALPH_DST/skills/playwright-skill"
+mkdir -p "$PW_DST/lib"
+cp "$PW_SRC/SKILL.md" "$PW_DST/SKILL.md"
+cp "$PW_SRC/API_REFERENCE.md" "$PW_DST/API_REFERENCE.md"
+cp "$PW_SRC/run.js" "$PW_DST/run.js"
+cp "$PW_SRC/package.json" "$PW_DST/package.json"
+cp "$PW_SRC/lib/helpers.js" "$PW_DST/lib/helpers.js"
+
+# Install playwright runtime (npm + chromium) if not already set up
+if [ ! -d "$PW_DST/node_modules" ]; then
+  echo "  Installing playwright runtime (npm + chromium)..."
+  (cd "$PW_DST" && npm run setup 2>&1) || {
+    echo "  Warning: playwright setup failed — run manually: cd $PW_DST && npm run setup"
+  }
+else
+  echo "  playwright-skill runtime already installed"
+fi
 
 # Make scripts executable
 chmod +x "$RALPH_DST/ralph.sh"
@@ -71,16 +92,18 @@ if [ ! -d "$PLUGIN_CACHE" ]; then
   mkdir -p "$PLUGIN_CACHE/skills/prd_init"
   mkdir -p "$PLUGIN_CACHE/skills/prd_append"
   mkdir -p "$PLUGIN_CACHE/skills/karpathy-guidelines"
+  mkdir -p "$PLUGIN_CACHE/skills/playwright-skill"
   mkdir -p "$PLUGIN_CACHE/.claude-plugin"
 
   cp "$RALPH_SRC/skills/prd_init/SKILL.md" "$PLUGIN_CACHE/skills/prd_init/SKILL.md"
   cp "$RALPH_SRC/skills/prd_append/SKILL.md" "$PLUGIN_CACHE/skills/prd_append/SKILL.md"
   cp "$RALPH_SRC/skills/karpathy-guidelines/SKILL.md" "$PLUGIN_CACHE/skills/karpathy-guidelines/SKILL.md"
+  cp "$RALPH_SRC/skills/playwright-skill/SKILL.md" "$PLUGIN_CACHE/skills/playwright-skill/SKILL.md"
   cat > "$PLUGIN_CACHE/.claude-plugin/plugin.json" << 'JSON'
 {
   "name": "ralph-framework",
   "version": "1.0.0",
-  "description": "Ralph autonomous coding agent: prd_init, prd_append, karpathy-guidelines skills."
+  "description": "Ralph autonomous coding agent: prd_init, prd_append, karpathy-guidelines, playwright-skill skills."
 }
 JSON
 
@@ -111,6 +134,8 @@ else
   cp "$RALPH_SRC/skills/prd_init/SKILL.md" "$PLUGIN_CACHE/skills/prd_init/SKILL.md"
   cp "$RALPH_SRC/skills/prd_append/SKILL.md" "$PLUGIN_CACHE/skills/prd_append/SKILL.md"
   cp "$RALPH_SRC/skills/karpathy-guidelines/SKILL.md" "$PLUGIN_CACHE/skills/karpathy-guidelines/SKILL.md"
+  mkdir -p "$PLUGIN_CACHE/skills/playwright-skill"
+  cp "$RALPH_SRC/skills/playwright-skill/SKILL.md" "$PLUGIN_CACHE/skills/playwright-skill/SKILL.md"
   echo "  Updated ralph-framework plugin skills"
 fi
 
@@ -146,7 +171,7 @@ echo ""
 echo "Ralph Framework installed successfully!"
 echo ""
 echo "Next steps:"
-echo "  1. Restart Claude Code to activate prd_init, prd_append, karpathy-guidelines skills"
+echo "  1. Restart Claude Code to activate prd_init, prd_append, karpathy-guidelines, playwright-skill skills"
 echo "  2. Edit scripts/ralph/ralph.config to configure PRD location & stories field"
 echo "  3. New project: use the 'prd_init' skill in Claude Code"
 echo "  4. Mid-project bugs/features: use the 'prd_append' skill in Claude Code"

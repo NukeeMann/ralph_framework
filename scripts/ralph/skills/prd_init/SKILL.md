@@ -154,7 +154,7 @@ Never have a story depend on a later story.
 **Always include as final criterion:**
 - `"Typecheck passes"` — every story
 - `"Tests pass"` — stories with testable logic
-- `"Verify in browser using dev-browser skill"` — every UI story
+- `"Verify in browser using playwright-skill"` — every UI story
 - `"A failing test reproducing the bug exists before the fix"` — every bug fix story
 
 ### Archiving Previous Runs

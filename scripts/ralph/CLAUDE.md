@@ -86,15 +86,40 @@ Before writing any code:
 - Keep changes focused and minimal
 - Follow existing code patterns
 
-## Browser Testing (If Available)
+## Browser Testing (Required for UI Stories)
 
-For any story that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):
+When a story changes UI (HTML, CSS, templates, components, pages, layouts, or has tag `ui`), you MUST verify it in a browser using the playwright-skill before committing.
 
-1. Navigate to the relevant page
-2. Verify the UI changes work as expected
-3. Take a screenshot if helpful for the progress log
+The playwright-skill is located at `scripts/ralph/skills/playwright-skill/` in the project. Use this path for all commands below.
 
-If no browser tools are available, note in your progress report that manual browser verification is needed.
+### How to test
+
+1. Detect running dev servers first — do NOT hardcode URLs:
+   ```bash
+   cd scripts/ralph/skills/playwright-skill && node -e "require('./lib/helpers').detectDevServers().then(s => console.log(JSON.stringify(s)))"
+   ```
+2. Write a test script to `/tmp/playwright-test-<story-id>.js` with `TARGET_URL` at the top
+3. Always use `headless: true` — Ralph agents run without a display server (WSL2)
+4. Execute via run.js:
+   ```bash
+   cd scripts/ralph/skills/playwright-skill && node run.js /tmp/playwright-test-<story-id>.js
+   ```
+5. Take screenshots to `/tmp/` as evidence of test results
+
+### What to verify
+
+- Page loads without errors (check console for JS errors)
+- Acceptance criteria are visually met
+- Responsive viewports if layout changed (mobile 375px, tablet 768px, desktop 1280px)
+- Interactive elements work (buttons, forms, navigation)
+
+### When to skip
+
+- Story only changes backend logic, APIs, or database
+- Story only changes config, docs, or tests
+- No dev server can be started (note in progress report)
+
+Include test results and screenshot paths in your progress report.
 
 ## Important
 
