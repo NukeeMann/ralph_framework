@@ -2,13 +2,16 @@
 .worktrees/
 .ralph-locks/
 scripts/ralph/logs/*.log
-scripts/ralph/logs/*.log.npm
+scripts/ralph/logs/*.log.*
 scripts/ralph/.last-branch
 
 # Project-specific files (not part of framework)
 scripts/ralph/prd.json
 scripts/ralph/progress.txt
 scripts/ralph/archive/
+
+# Dependencies
+node_modules/
 
 # OS
 .DS_Store

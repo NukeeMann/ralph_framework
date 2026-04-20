@@ -10,8 +10,9 @@ Ralph reads a PRD with prioritized user stories, picks one story per iteration, 
 2. Ralph picks the highest-priority incomplete stories
 3. Spawns parallel AI agents (Claude Code or Amp) in git worktrees to implement them
 4. Agents commit changes, log progress, and exit
-5. Ralph merges completed branches, picks next stories, and repeats
-6. Mid-project: use `prd_append` to triage bugs and new features into the existing `prd.json`
+5. If `VALIDATE_CMD` is set, Ralph runs build/test validation before allowing merge
+6. Ralph merges completed branches (rejecting real source conflicts for retry), picks next stories, and repeats
+7. Mid-project: use `prd_append` to triage bugs and new features into the existing `prd.json`
 
 ## Quick Start
 
@@ -66,6 +67,9 @@ STORIES_FIELD="userStories"
 
 # For non-npm projects
 INSTALL_CMD="pip install -r requirements.txt"
+
+# Validate after agent commits, before merge
+VALIDATE_CMD="npm run build && npm test"
 ```
 
 ### Run
@@ -100,6 +104,7 @@ INSTALL_CMD="pip install -r requirements.txt"
 | `PRD_DIR` | `$SCRIPT_DIR` | Directory containing `prd.json` |
 | `STORIES_FIELD` | auto-detect | JSON field name: `stories` or `userStories` |
 | `INSTALL_CMD` | `npm install ...` | Dependency install command for worktrees |
+| `VALIDATE_CMD` | *(empty)* | Command to validate code before merge (e.g. `npm run build && npm test`) |
 
 ## Skills
 
@@ -123,6 +128,11 @@ Mid-project triage. Reads the existing `prd.json`, takes a rough list of bugs an
 
 Reference for the four behavioral principles applied to every agent iteration: Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution. These are already embedded in `CLAUDE.md` — use this skill for detailed reference or discussion.
 
+### `playwright-skill`
+**Trigger:** "test website", "check UI", "take screenshot", "browser test"
+
+Browser automation via Playwright. Auto-detects running dev servers, writes test scripts to `/tmp`, executes via `run.js`. Used automatically by Ralph agents when stories involve UI changes (detected via `ui` tag or HTML/CSS/template changes). Runs headless in Ralph mode (WSL2).
+
 ## Directory Structure
 
 ```
@@ -138,6 +148,7 @@ scripts/ralph/
     prd_init/           # New project: questions → prd.json
     prd_append/         # Mid-project: triage bugs/features → append to prd.json
     karpathy-guidelines/  # Coding philosophy reference
+    playwright-skill/     # Browser automation (Playwright)
 ```
 
 ## How Ralph Learns

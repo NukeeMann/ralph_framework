@@ -11,6 +11,7 @@ CONFIG_FILE="$SCRIPT_DIR/ralph.config"
 PRD_DIR="$SCRIPT_DIR"
 STORIES_FIELD=""
 INSTALL_CMD="npm install --ignore-scripts --no-audit --no-fund"
+VALIDATE_CMD=""
 if [ -f "$CONFIG_FILE" ]; then
   source "$CONFIG_FILE"
 fi
@@ -274,9 +275,20 @@ branch_name() {
   echo "ralph/$(echo "$1" | tr '[:upper:]' '[:lower:]')"
 }
 
-# Simple file-based lock to serialize git setup operations
-git_lock()   { while ! mkdir "$LOCK_DIR/git.lock" 2>/dev/null; do sleep 0.2; done; }
-git_unlock() { rmdir "$LOCK_DIR/git.lock" 2>/dev/null || true; }
+# flock-based lock to serialize git operations (survives crashes, no stale locks)
+GIT_LOCK_FILE="$LOCK_DIR/git.lock"
+GIT_LOCK_FD=""
+git_lock() {
+  exec {GIT_LOCK_FD}>"$GIT_LOCK_FILE"
+  flock -x "$GIT_LOCK_FD"
+}
+git_unlock() {
+  if [ -n "$GIT_LOCK_FD" ]; then
+    flock -u "$GIT_LOCK_FD"
+    exec {GIT_LOCK_FD}>&-
+    GIT_LOCK_FD=""
+  fi
+}
 
 # ============================================================================
 # Worker: runs one task in a worktree
@@ -313,6 +325,64 @@ run_worker() {
     log_task "$task_id" "${BYELLOW}Dependency install failed (check $logfile.npm)${RST}"
   }
 
+  # Install playwright-skill runtime in worktree if skill exists but node_modules missing
+  local pw_skill_dir="$worktree_dir/scripts/ralph/skills/playwright-skill"
+  if [ -f "$pw_skill_dir/package.json" ] && [ ! -d "$pw_skill_dir/node_modules" ]; then
+    log_task "$task_id" "${CYAN}Installing playwright-skill runtime...${RST}"
+    (cd "$pw_skill_dir" && npm run setup 2>&1) > "$logfile.pw" 2>&1 || {
+      log_task "$task_id" "${BYELLOW}playwright-skill setup failed (check $logfile.pw)${RST}"
+    }
+  fi
+
+  # Build enriched prompt with story context
+  local story_json
+  story_json=$(jq -r ".${STORIES_FIELD}[] | select(.id == \"$task_id\")" "$PRD" 2>/dev/null)
+  local story_title story_desc story_criteria story_tags
+  story_title=$(echo "$story_json" | jq -r '.title // empty')
+  story_desc=$(echo "$story_json" | jq -r '.description // empty')
+  story_criteria=$(echo "$story_json" | jq -r '
+    if .acceptanceCriteria then
+      if (.acceptanceCriteria | type) == "array" then
+        .acceptanceCriteria | map("- " + .) | join("\n")
+      else .acceptanceCriteria end
+    elif .acceptance_criteria then
+      if (.acceptance_criteria | type) == "array" then
+        .acceptance_criteria | map("- " + .) | join("\n")
+      else .acceptance_criteria end
+    else empty end')
+  story_tags=$(echo "$story_json" | jq -r '
+    if .tags then
+      if (.tags | type) == "array" then .tags | join(", ")
+      else .tags end
+    else empty end')
+
+  local recent_progress=""
+  if [ -f "$SCRIPT_DIR/progress.txt" ]; then
+    recent_progress=$(tail -30 "$SCRIPT_DIR/progress.txt" 2>/dev/null || true)
+  fi
+
+  local enriched_prompt
+  enriched_prompt="You are Ralph, an autonomous coding agent. Read scripts/ralph/CLAUDE.md and follow ALL instructions there.
+
+YOUR TASK: $task_id - $story_title
+$([ -n "$story_desc" ] && echo "
+DESCRIPTION:
+$story_desc")
+$([ -n "$story_criteria" ] && echo "
+ACCEPTANCE CRITERIA:
+$story_criteria")
+$([ -n "$story_tags" ] && echo "
+TAGS: $story_tags")
+
+RULES:
+- Work ONLY on task $task_id. Do NOT touch other stories.
+- You are already on the correct branch - do NOT switch branches.
+- The project PRD is at prd.json (or scripts/ralph/prd.json - check ralph.config).
+- After implementing, run quality checks, then commit your changes.
+$([ -n "$recent_progress" ] && echo "
+RECENT PROGRESS (from prior iterations):
+$recent_progress")"
+
   # Run claude in worktree
   log_task "$task_id" "${BCYAN}Running $TOOL${RST} in worktree..."
 
@@ -322,7 +392,7 @@ run_worker() {
       --model "$MODEL" \
       --dangerously-skip-permissions \
       --print \
-      -p "You are Ralph, an autonomous coding agent. Read scripts/ralph/CLAUDE.md and follow ALL instructions there. Your assigned task is: $task_id. Do NOT work on any other task. The project PRD is at prd.json in the repo root. You are already on the correct branch - do NOT switch branches. After implementing, commit your changes." \
+      -p "$enriched_prompt" \
       2>&1 | tee "$logfile" || exit_code=$?
   else
     RALPH_TASK_ID="$task_id" cat "$SCRIPT_DIR/CLAUDE.md" | amp --dangerously-allow-all \
@@ -354,6 +424,24 @@ run_worker() {
     git branch -D "$branch" 2>/dev/null || true
     git_unlock
     return 1
+  fi
+
+  # Validation gate: run VALIDATE_CMD before allowing merge
+  if [ -n "$VALIDATE_CMD" ]; then
+    log_task "$task_id" "${BCYAN}Validating${RST} (${DIM}$VALIDATE_CMD${RST})..."
+    cd "$worktree_dir"
+    local val_exit=0
+    eval "$VALIDATE_CMD" > "$logfile.validate" 2>&1 || val_exit=$?
+    if [ $val_exit -ne 0 ]; then
+      log_task "$task_id" "${BRED}Validation FAILED${RST} (exit $val_exit) — see $logfile.validate"
+      git_lock
+      cd "$REPO_ROOT"
+      git worktree remove "$worktree_dir" --force 2>/dev/null || true
+      git branch -D "$branch" 2>/dev/null || true
+      git_unlock
+      return 1
+    fi
+    log_task "$task_id" "${BGREEN}Validation passed${RST}"
   fi
 
   # Push branch
@@ -502,6 +590,7 @@ print_merge_box() {
 
 merge_tasks() {
   local tasks=("$@")
+  merge_failed=()
   echo ""
   hr "-" "$BLUE"
   log_step "${BBLUE}Merging ${#tasks[@]} branch(es) -> $BASE_BRANCH${RST}"
@@ -522,29 +611,56 @@ merge_tasks() {
 
     log_task "$task_id" "${BLUE}Merging${RST} ${CYAN}$branch${RST} -> ${CYAN}$BASE_BRANCH${RST}"
 
-    # --no-ff handles diverging branches (no fast-forward-only errors)
     if git merge --no-ff --no-edit "$branch" 2>&1; then
       log_task "$task_id" "${BGREEN}Merged cleanly${RST}"
       print_merge_box "$task_id" "$branch" "clean"
     else
-      log_task "$task_id" "${BYELLOW}Conflict detected${RST} - auto-resolving..."
+      log_task "$task_id" "${BYELLOW}Conflict detected${RST} - analyzing..."
 
-      # prd.json: always keep ours (base) - orchestrator manages this file
+      # Categorize conflicting files
+      local conflicted_files auto_resolvable=() needs_human=()
+      conflicted_files=$(git diff --name-only --diff-filter=U 2>/dev/null || true)
+
+      while IFS= read -r cf; do
+        [ -z "$cf" ] && continue
+        case "$cf" in
+          prd.json)                   auto_resolvable+=("$cf") ;;
+          package-lock.json)          auto_resolvable+=("$cf") ;;
+          *.lock)                     auto_resolvable+=("$cf") ;;
+          .gitignore)                 auto_resolvable+=("$cf") ;;
+          *)                          needs_human+=("$cf") ;;
+        esac
+      done <<< "$conflicted_files"
+
+      if [ ${#needs_human[@]} -gt 0 ]; then
+        # Real source conflict — abort merge, mark as failed for retry
+        log_task "$task_id" "${BRED}Source conflict in ${#needs_human[@]} file(s):${RST}"
+        for hf in "${needs_human[@]}"; do
+          log_task "$task_id" "  ${RED}$hf${RST}"
+        done
+        git merge --abort 2>/dev/null || true
+        log_task "$task_id" "${YELLOW}Merge aborted — task will retry on fresh base${RST}"
+        git branch -D "$branch" 2>/dev/null || true
+        git push origin --delete "$branch" 2>/dev/null || true
+        merge_failed+=("$task_id")
+        continue
+      fi
+
+      # Only auto-resolvable files — safe to resolve
+      log_task "$task_id" "${CYAN}Auto-resolving ${#auto_resolvable[@]} safe file(s)${RST}"
+
+      # prd.json: always keep ours (orchestrator manages)
       git checkout --ours prd.json 2>/dev/null || true
 
-      # Everything else: accept theirs (feature branch wins)
-      git diff --name-only --diff-filter=U 2>/dev/null | grep -v prd.json | while read -r f; do
-        git checkout --theirs "$f" 2>/dev/null || true
+      # Lock files / generated files: accept theirs
+      for af in "${auto_resolvable[@]}"; do
+        [ "$af" = "prd.json" ] && continue
+        git checkout --theirs "$af" 2>/dev/null || true
       done
-
-      # package-lock.json: regenerate if conflicted (--theirs often breaks it)
-      if git diff --name-only --diff-filter=U 2>/dev/null | grep -q "package-lock.json"; then
-        git checkout --theirs package-lock.json 2>/dev/null || true
-      fi
 
       git add -A
       git commit --no-edit -m "merge: $task_id with auto-resolved conflicts" || true
-      log_task "$task_id" "${GREEN}Conflict resolved${RST}"
+      log_task "$task_id" "${GREEN}Conflict resolved (safe files only)${RST}"
       print_merge_box "$task_id" "$branch" "conflict"
     fi
 
@@ -593,6 +709,11 @@ echo -e "  ${BOLD}Base:${RST}      ${CYAN}$BASE_BRANCH${RST}"
 echo -e "  ${BOLD}Tasks:${RST}     ${BWHITE}$total_tasks${RST} total in PRD"
 echo -e "  ${BOLD}Max iter:${RST}  ${DIM}$MAX_ITERATIONS${RST}"
 echo -e "  ${BOLD}Max retry:${RST} ${DIM}$MAX_RETRIES${RST} per task"
+if [ -n "$VALIDATE_CMD" ]; then
+  echo -e "  ${BOLD}Validate:${RST}  ${BGREEN}$VALIDATE_CMD${RST}"
+else
+  echo -e "  ${BOLD}Validate:${RST}  ${YELLOW}disabled${RST} ${DIM}(set VALIDATE_CMD in ralph.config)${RST}"
+fi
 hr "=" "$BBLUE"
 echo ""
 
@@ -600,8 +721,8 @@ cd "$REPO_ROOT"
 git checkout "$BASE_BRANCH"
 git pull --rebase origin "$BASE_BRANCH" 2>/dev/null || true
 
-# Cleanup stale locks
-rm -rf "$LOCK_DIR/git.lock" 2>/dev/null
+# Ensure lock directory exists (flock uses file-based locks, no stale lock cleanup needed)
+touch "$GIT_LOCK_FILE" 2>/dev/null || true
 
 batch_num=0
 iteration=0
@@ -708,6 +829,17 @@ while [ $iteration -lt $MAX_ITERATIONS ]; do
   # Merge successful tasks
   if [ ${#merge_list[@]} -gt 0 ]; then
     merge_tasks "${merge_list[@]}"
+
+    # Handle tasks that failed during merge (source conflicts)
+    for mf in "${merge_failed[@]}"; do
+      RETRIES[$mf]=$(( ${RETRIES[$mf]:-0} + 1 ))
+      report_failure "$mf" "${RETRIES[$mf]}" "$MAX_RETRIES"
+      if [ "${RETRIES[$mf]}" -le "$MAX_RETRIES" ]; then
+        log_task "$mf" "${YELLOW}Merge conflict — will retry on fresh base${RST} (attempt ${BWHITE}${RETRIES[$mf]}${RST}/${MAX_RETRIES})"
+      else
+        log_task "$mf" "${BRED}GAVE UP${RST} after ${MAX_RETRIES} retries (merge conflicts)"
+      fi
+    done
   fi
 done
 
