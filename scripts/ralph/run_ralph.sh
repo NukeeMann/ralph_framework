@@ -40,7 +40,7 @@ MAX_RETRIES=2
 CREATE_PR=true
 TOOL="claude"
 MODEL="opus"  # opus | sonnet | haiku
-BASE_BRANCH="main"
+BASE_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
     --model|-m)      MODEL="$2"; shift 2 ;;
     --base)          BASE_BRANCH="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: ./run_ralph.sh [--parallel N] [--max-iterations N] [--max-retries N] [--no-pr] [--tool claude|amp] [--base main]"
+      echo "Usage: ./run_ralph.sh [--parallel N] [--max-iterations N] [--max-retries N] [--no-pr] [--tool claude|amp] [--base BRANCH]"
       echo ""
       echo "  --parallel N      Run N tasks in parallel (default: 2)"
       echo "  --max-iterations  Max total iterations (default: 50)"
@@ -61,7 +61,7 @@ while [[ $# -gt 0 ]]; do
       echo "  --no-pr           Skip PR creation, merge directly"
       echo "  --tool            claude or amp (default: claude)"
       echo "  --model, -m       Claude model: opus, sonnet, haiku (default: opus)"
-      echo "  --base            Base branch (default: main)"
+      echo "  --base            Base branch (default: current branch)"
       exit 0
       ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
