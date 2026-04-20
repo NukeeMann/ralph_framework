@@ -34,7 +34,6 @@ mkdir -p "$RALPH_DST/logs"
 mkdir -p "$RALPH_DST/archive"
 
 # Copy core scripts
-cp "$RALPH_SRC/ralph.sh" "$RALPH_DST/ralph.sh"
 cp "$RALPH_SRC/run_ralph.sh" "$RALPH_DST/run_ralph.sh"
 cp "$RALPH_SRC/CLAUDE.md" "$RALPH_DST/CLAUDE.md"
 
@@ -52,7 +51,6 @@ cp "$RALPH_SRC/skills/prd_append/SKILL.md" "$RALPH_DST/skills/prd_append/SKILL.m
 cp "$RALPH_SRC/skills/karpathy-guidelines/SKILL.md" "$RALPH_DST/skills/karpathy-guidelines/SKILL.md"
 
 # Make scripts executable
-chmod +x "$RALPH_DST/ralph.sh"
 chmod +x "$RALPH_DST/run_ralph.sh"
 
 # Initialize progress file if it doesn't exist
@@ -152,5 +150,4 @@ echo "  1. Restart Claude Code to activate prd_init, prd_append, karpathy-guidel
 echo "  2. Edit scripts/ralph/ralph.config to configure PRD location & stories field"
 echo "  3. New project: use the 'prd_init' skill in Claude Code"
 echo "  4. Mid-project bugs/features: use the 'prd_append' skill in Claude Code"
-echo "  5. Run single iteration:  ./scripts/ralph/ralph.sh --tool claude"
-echo "  6. Run parallel orchestrator: ./scripts/ralph/run_ralph.sh --parallel 2 --tool claude"
+echo "  5. Run orchestrator: ./scripts/ralph/run_ralph.sh --parallel 2 --tool claude"
