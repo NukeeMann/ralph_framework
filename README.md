@@ -7,12 +7,11 @@ Ralph reads a PRD with prioritized user stories, picks one story per iteration, 
 ## How It Works
 
 1. Use the `prd_init` skill in Claude Code — it asks up to 10 clarifying questions and writes `prd.json` directly
-2. Ralph picks the highest-priority incomplete story
-3. Spawns a fresh AI agent (Claude Code or Amp) to implement it
-4. Agent commits changes, logs progress, and exits
-5. Ralph picks the next story and repeats
-6. Parallel mode runs multiple stories simultaneously in git worktrees
-7. Mid-project: use `prd_append` to triage bugs and new features into the existing `prd.json`
+2. Ralph picks the highest-priority incomplete stories
+3. Spawns parallel AI agents (Claude Code or Amp) in git worktrees to implement them
+4. Agents commit changes, log progress, and exit
+5. Ralph merges completed branches, picks next stories, and repeats
+6. Mid-project: use `prd_append` to triage bugs and new features into the existing `prd.json`
 
 ## Quick Start
 
@@ -91,7 +90,7 @@ INSTALL_CMD="pip install -r requirements.txt"
 --no-pr           Skip PR creation, merge directly
 --tool            claude or amp (default: claude)
 --model, -m       Claude model: opus, sonnet, haiku (default: opus)
---base            Base branch (default: main)
+--base            Base branch (default: current branch)
 ```
 
 ## Configuration (ralph.config)
@@ -128,16 +127,16 @@ Reference for the four behavioral principles applied to every agent iteration: T
 
 ```
 scripts/ralph/
-  ralph.sh        # Parallel orchestrator
-  CLAUDE.md           # Agent instructions (read by each iteration)
-  ralph.config        # Configuration overrides
-  prd.json            # Your project's PRD (generated, not committed)
-  progress.txt        # Cumulative progress log (generated)
-  logs/               # Per-task execution logs
-  archive/            # Archived previous runs
+  ralph.sh              # Parallel orchestrator
+  CLAUDE.md             # Agent instructions (read by each iteration)
+  ralph.config          # Configuration overrides
+  prd.json              # Your project's PRD (generated, not committed)
+  progress.txt          # Cumulative progress log (generated)
+  logs/                 # Per-task execution logs
+  archive/              # Archived previous runs
   skills/
-    prd_init/         # New project: questions → prd.json
-    prd_append/       # Mid-project: triage bugs/features → append to prd.json
+    prd_init/           # New project: questions → prd.json
+    prd_append/         # Mid-project: triage bugs/features → append to prd.json
     karpathy-guidelines/  # Coding philosophy reference
 ```
 
@@ -150,7 +149,7 @@ Each iteration appends to `progress.txt` with:
 
 General patterns get consolidated into a `## Codebase Patterns` section at the top of `progress.txt`, which future iterations read first. This gives Ralph a growing understanding of your codebase across iterations.
 
-Ralph also updates `CLAUDE.md` files in directories it modifies, preserving module-specific knowledge for future work.
+Ralph also updates nearby `CLAUDE.md` files in directories it modifies, preserving module-specific knowledge for future work.
 
 ## Coding Philosophy
 

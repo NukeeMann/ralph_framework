@@ -4,7 +4,7 @@ You are an autonomous coding agent working on a software project.
 
 ## Your Task
 
-1. Read the PRD at `prd.json` (in the repository root)
+1. Read the PRD at `prd.json` (in `scripts/ralph/` by default, or repo root if configured)
 2. Read the progress log at `scripts/ralph/progress.txt` (check Codebase Patterns section first)
 3. If the env var `RALPH_TASK_ID` is set, work on THAT specific story. Otherwise, pick the **highest priority** user story where `passes: false`.
 4. You are already on the correct branch - do NOT switch branches.
@@ -95,15 +95,6 @@ For any story that changes UI, verify it works in the browser if you have browse
 3. Take a screenshot if helpful for the progress log
 
 If no browser tools are available, note in your progress report that manual browser verification is needed.
-
-## Stop Condition
-
-After completing a user story, check if ALL stories have `passes: true`.
-
-If ALL stories are complete and passing, reply with:
-<promise>COMPLETE</promise>
-
-If there are still stories with `passes: false`, end your response normally (another iteration will pick up the next story).
 
 ## Important
 
