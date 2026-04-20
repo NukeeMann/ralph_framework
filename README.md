@@ -72,17 +72,17 @@ INSTALL_CMD="pip install -r requirements.txt"
 ### Run
 
 ```bash
-./scripts/ralph/run_ralph.sh --parallel 2 --tool claude --model opus
+./scripts/ralph/ralph.sh --parallel 2 --tool claude --model opus
 ```
 
 ## Scripts
 
 | Script | Purpose |
 |--------|---------|
-| `run_ralph.sh` | Parallel orchestrator with git worktrees, auto-merge, PR creation, retry logic. |
+| `ralph.sh` | Parallel orchestrator with git worktrees, auto-merge, PR creation, retry logic. |
 | `init.sh` | Bootstraps ralph into a new project. |
 
-## run_ralph.sh Options
+## ralph.sh Options
 
 ```
 --parallel N      Run N tasks in parallel (default: 2)
@@ -128,7 +128,7 @@ Reference for the four behavioral principles applied to every agent iteration: T
 
 ```
 scripts/ralph/
-  run_ralph.sh        # Parallel orchestrator
+  ralph.sh        # Parallel orchestrator
   CLAUDE.md           # Agent instructions (read by each iteration)
   ralph.config        # Configuration overrides
   prd.json            # Your project's PRD (generated, not committed)

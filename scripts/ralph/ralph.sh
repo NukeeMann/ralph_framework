@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Loop Orchestrator - parallel task execution with git worktrees
-# Usage: ./run_ralph.sh [--parallel N] [--max-iterations N] [--no-pr] [--tool claude|amp]
+# Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--no-pr] [--tool claude|amp]
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
     --model|-m)      MODEL="$2"; shift 2 ;;
     --base)          BASE_BRANCH="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: ./run_ralph.sh [--parallel N] [--max-iterations N] [--max-retries N] [--no-pr] [--tool claude|amp] [--base BRANCH]"
+      echo "Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--max-retries N] [--no-pr] [--tool claude|amp] [--base BRANCH]"
       echo ""
       echo "  --parallel N      Run N tasks in parallel (default: 2)"
       echo "  --max-iterations  Max total iterations (default: 50)"
