@@ -2,7 +2,7 @@
 
 Autonomous AI coding agent loop for executing projects from PRDs (Product Requirements Documents).
 
-Ralph reads a PRD with prioritized user stories, picks one story per iteration, implements it, runs quality checks, commits, and moves to the next. It supports both sequential and parallel execution with git worktrees.
+Ralph reads a PRD with prioritized user stories, picks one story per iteration, implements it, runs quality checks, commits, and moves to the next. It supports parallel execution with git worktrees.
 
 ## How It Works
 
@@ -72,10 +72,6 @@ INSTALL_CMD="pip install -r requirements.txt"
 ### Run
 
 ```bash
-# Single iteration mode (one story at a time)
-./scripts/ralph/ralph.sh --tool claude 20
-
-# Parallel orchestrator (multiple stories via git worktrees)
 ./scripts/ralph/run_ralph.sh --parallel 2 --tool claude --model opus
 ```
 
@@ -83,7 +79,6 @@ INSTALL_CMD="pip install -r requirements.txt"
 
 | Script | Purpose |
 |--------|---------|
-| `ralph.sh` | Single-iteration loop runner. Runs one story per iteration sequentially. |
 | `run_ralph.sh` | Parallel orchestrator with git worktrees, auto-merge, PR creation, retry logic. |
 | `init.sh` | Bootstraps ralph into a new project. |
 
@@ -133,7 +128,6 @@ Reference for the four behavioral principles applied to every agent iteration: T
 
 ```
 scripts/ralph/
-  ralph.sh            # Single iteration runner
   run_ralph.sh        # Parallel orchestrator
   CLAUDE.md           # Agent instructions (read by each iteration)
   ralph.config        # Configuration overrides
