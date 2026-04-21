@@ -8,7 +8,7 @@ Ralph reads a PRD with prioritized user stories, picks one story per iteration, 
 
 1. Use the `prd_init` skill in Claude Code — it asks up to 10 clarifying questions and writes `prd.json` directly
 2. Ralph picks the highest-priority incomplete stories
-3. Spawns parallel AI agents (Claude Code or Amp) in git worktrees to implement them
+3. Spawns parallel Claude Code agents in git worktrees to implement them
 4. Agents commit changes, log progress, and exit
 5. If `VALIDATE_CMD` is set, Ralph runs build/test validation before allowing merge
 6. Ralph merges completed branches (rejecting real source conflicts for retry), picks next stories, and repeats
@@ -75,7 +75,7 @@ VALIDATE_CMD="npm run build && npm test"
 ### Run
 
 ```bash
-./scripts/ralph/ralph.sh --parallel 2 --tool claude --model opus
+./scripts/ralph/ralph.sh --parallel 2 --model opus
 ```
 
 ## Scripts
@@ -92,7 +92,6 @@ VALIDATE_CMD="npm run build && npm test"
 --max-iterations  Max total iterations (default: 50)
 --max-retries N   Max retries per failed task (default: 2)
 --no-pr           Skip PR creation, merge directly
---tool            claude or amp (default: claude)
 --model, -m       Claude model: opus, sonnet, haiku (default: opus)
 --base            Base branch (default: current branch)
 ```

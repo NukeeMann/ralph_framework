@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Loop Orchestrator - parallel task execution with git worktrees
-# Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--no-pr] [--tool claude|amp]
+# Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--no-pr]
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -39,7 +39,6 @@ PARALLEL=2
 MAX_ITERATIONS=50
 MAX_RETRIES=2
 CREATE_PR=true
-TOOL="claude"
 MODEL="opus"  # opus | sonnet | haiku
 BASE_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")"
 
@@ -50,17 +49,15 @@ while [[ $# -gt 0 ]]; do
     --max-iterations) MAX_ITERATIONS="$2"; shift 2 ;;
     --max-retries)   MAX_RETRIES="$2"; shift 2 ;;
     --no-pr)         CREATE_PR=false; shift ;;
-    --tool)          TOOL="$2"; shift 2 ;;
     --model|-m)      MODEL="$2"; shift 2 ;;
     --base)          BASE_BRANCH="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--max-retries N] [--no-pr] [--tool claude|amp] [--base BRANCH]"
+      echo "Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--max-retries N] [--no-pr] [--base BRANCH]"
       echo ""
       echo "  --parallel N      Run N tasks in parallel (default: 2)"
       echo "  --max-iterations  Max total iterations (default: 50)"
       echo "  --max-retries N   Max retries per failed task (default: 2)"
       echo "  --no-pr           Skip PR creation, merge directly"
-      echo "  --tool            claude or amp (default: claude)"
       echo "  --model, -m       Claude model: opus, sonnet, haiku (default: opus)"
       echo "  --base            Base branch (default: current branch)"
       exit 0
@@ -384,23 +381,18 @@ RECENT PROGRESS (from prior iterations):
 $recent_progress")"
 
   # Run claude in worktree
-  log_task "$task_id" "${BCYAN}Running $TOOL${RST} in worktree..."
+  log_task "$task_id" "${BCYAN}Running claude${RST} in worktree..."
 
   local exit_code=0
-  if [[ "$TOOL" == "claude" ]]; then
-    RALPH_TASK_ID="$task_id" stdbuf -oL claude \
-      --model "$MODEL" \
-      --dangerously-skip-permissions \
-      --print \
-      -p "$enriched_prompt" \
-      2>&1 | tee "$logfile" || exit_code=$?
-  else
-    RALPH_TASK_ID="$task_id" cat "$SCRIPT_DIR/CLAUDE.md" | amp --dangerously-allow-all \
-      > "$logfile" 2>&1 || exit_code=$?
-  fi
+  RALPH_TASK_ID="$task_id" stdbuf -oL claude \
+    --model "$MODEL" \
+    --dangerously-skip-permissions \
+    --print \
+    -p "$enriched_prompt" \
+    2>&1 | tee "$logfile" || exit_code=$?
 
   if [ $exit_code -ne 0 ]; then
-    log_task "$task_id" "${BYELLOW}!!${RST} $TOOL exited with code ${BRED}$exit_code${RST} (check $logfile)"
+    log_task "$task_id" "${BYELLOW}!!${RST} claude exited with code ${BRED}$exit_code${RST} (check $logfile)"
   fi
 
   # Check if there are any commits on this branch beyond base
@@ -703,7 +695,7 @@ echo -e "${BBLUE}              |_|           ${RST}${DIM}Loop Orchestrator${RST}
 echo ""
 hr "=" "$BBLUE"
 echo -e "  ${BOLD}Parallel:${RST}  ${BCYAN}$PARALLEL${RST} workers"
-echo -e "  ${BOLD}Tool:${RST}      ${BCYAN}$TOOL${RST} (model: ${BCYAN}$MODEL${RST})"
+echo -e "  ${BOLD}Tool:${RST}      ${BCYAN}claude${RST} (model: ${BCYAN}$MODEL${RST})"
 echo -e "  ${BOLD}PRs:${RST}       $([ "$CREATE_PR" = true ] && echo -e "${BGREEN}enabled${RST}" || echo -e "${YELLOW}disabled${RST}")"
 echo -e "  ${BOLD}Base:${RST}      ${CYAN}$BASE_BRANCH${RST}"
 echo -e "  ${BOLD}Tasks:${RST}     ${BWHITE}$total_tasks${RST} total in PRD"
