@@ -120,6 +120,8 @@ The project-local copies are what Ralph's orchestrator actually invokes during a
 | `STORIES_FIELD` | auto-detect | JSON field name: `stories` or `userStories` |
 | `INSTALL_CMD` | `npm install ...` | Dependency install command for worktrees |
 | `VALIDATE_CMD` | *(empty)* | Command to validate code before merge (e.g. `npm run build && npm test`) |
+| `TASK_TIMEOUT_SEC` | `1800` | Per-task timeout in seconds. Agent is killed and the task retried if it exceeds this. |
+| `PROGRESS_ROTATE_LINES` | `200` | Rotate `progress.txt` into `archive/` once it grows past this many lines. The `## Codebase Patterns` section is preserved across rotations. |
 
 ## Skills
 

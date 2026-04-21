@@ -12,6 +12,8 @@ PRD_DIR="$SCRIPT_DIR"
 STORIES_FIELD=""
 INSTALL_CMD="npm install --ignore-scripts --no-audit --no-fund"
 VALIDATE_CMD=""
+TASK_TIMEOUT_SEC=1800
+PROGRESS_ROTATE_LINES=200
 if [ -f "$CONFIG_FILE" ]; then
   source "$CONFIG_FILE"
 fi
@@ -182,6 +184,46 @@ count_total() {
   jq "[.${STORIES_FIELD}[]] | length" "$PRD"
 }
 
+# Rotate progress.txt when it grows past PROGRESS_ROTATE_LINES. The
+# Codebase Patterns section is preserved so future iterations still get
+# the consolidated knowledge; everything else goes to archive/.
+rotate_progress() {
+  local progress="$SCRIPT_DIR/progress.txt"
+  [ -f "$progress" ] || return 0
+  local line_count
+  line_count=$(wc -l < "$progress")
+  if [ "$line_count" -le "$PROGRESS_ROTATE_LINES" ]; then
+    return 0
+  fi
+
+  local archive_dir="$SCRIPT_DIR/archive"
+  mkdir -p "$archive_dir"
+  local stamp
+  stamp=$(date +%Y-%m-%d-%H%M)
+  local archive_file="$archive_dir/progress-$stamp.txt"
+  cp "$progress" "$archive_file"
+
+  local patterns
+  patterns=$(awk '
+    /^## Codebase Patterns/ { in_patterns = 1; print; next }
+    in_patterns && /^## / { in_patterns = 0 }
+    in_patterns { print }
+  ' "$progress")
+
+  {
+    echo "# Ralph Progress Log"
+    echo "Rotated: $(date)"
+    echo "Previous log archived to: archive/progress-$stamp.txt"
+    echo "---"
+    if [ -n "$patterns" ]; then
+      echo ""
+      echo "$patterns"
+    fi
+  } > "$progress"
+
+  log "Rotated progress.txt ($line_count lines -> archive/progress-$stamp.txt)"
+}
+
 mark_done() {
   local task_id="$1"
   local tmp="$PRD.tmp.$$"
@@ -320,16 +362,27 @@ $([ -n "$recent_progress" ] && echo "
 RECENT PROGRESS (from prior iterations):
 $recent_progress")"
 
-  # Run claude in worktree
-  log_task "$task_id" "Running claude in worktree..."
+  # Run claude in worktree (wrapped in timeout — kills hung agents)
+  log_task "$task_id" "Running claude in worktree (timeout ${TASK_TIMEOUT_SEC}s)..."
 
   local exit_code=0
-  RALPH_TASK_ID="$task_id" stdbuf -oL claude \
+  RALPH_TASK_ID="$task_id" timeout --foreground "$TASK_TIMEOUT_SEC" \
+    stdbuf -oL claude \
     --model "$MODEL" \
     --dangerously-skip-permissions \
     --print \
     -p "$enriched_prompt" \
     2>&1 | tee "$logfile" || exit_code=$?
+
+  if [ $exit_code -eq 124 ]; then
+    log_task "$task_id" "${RED}TIMEOUT${RST} after ${TASK_TIMEOUT_SEC}s — task will be retried"
+    git_lock
+    cd "$REPO_ROOT"
+    git worktree remove "$worktree_dir" --force 2>/dev/null || true
+    git branch -D "$branch" 2>/dev/null || true
+    git_unlock
+    return 1
+  fi
 
   if [ $exit_code -ne 0 ]; then
     log_task "$task_id" "claude exited with code $exit_code (check $logfile)"
@@ -527,6 +580,7 @@ iteration=0
 while [ $iteration -lt $MAX_ITERATIONS ]; do
   # Refresh title cache and counts each batch
   cache_task_titles
+  rotate_progress
   pending=$(count_pending)
   completed=$(( total_tasks - pending ))
 

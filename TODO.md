@@ -160,7 +160,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 
 ---
 
-## [ ] 9. Timeout per task + rotacja progress.txt
+## [x] 9. Timeout per task + rotacja progress.txt
 
 **Problem 1:** Brak timeoutu — agent może utknąć na godzinę. Przy opus to drogo.
 **Problem 2:** `progress.txt` rośnie nieograniczenie. Agent czyta tail -30 ale sam plik może mieć 5000 linii.
