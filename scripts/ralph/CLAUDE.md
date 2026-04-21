@@ -70,7 +70,7 @@ Before committing, check if any edited files have learnings worth preserving in 
 
 Only update CLAUDE.md if you have **genuinely reusable knowledge** that would help future work in that directory.
 
-## Coding Philosophy (Karpathy Guidelines)
+## Coding Philosophy
 
 Before writing any code:
 

@@ -29,7 +29,6 @@ echo ""
 # Create directory structure
 mkdir -p "$RALPH_DST/skills/prd_init"
 mkdir -p "$RALPH_DST/skills/prd_append"
-mkdir -p "$RALPH_DST/skills/karpathy-guidelines"
 mkdir -p "$RALPH_DST/skills/playwright-skill"
 mkdir -p "$RALPH_DST/logs"
 mkdir -p "$RALPH_DST/archive"
@@ -49,7 +48,6 @@ fi
 # Copy skills
 cp "$RALPH_SRC/skills/prd_init/SKILL.md" "$RALPH_DST/skills/prd_init/SKILL.md"
 cp "$RALPH_SRC/skills/prd_append/SKILL.md" "$RALPH_DST/skills/prd_append/SKILL.md"
-cp "$RALPH_SRC/skills/karpathy-guidelines/SKILL.md" "$RALPH_DST/skills/karpathy-guidelines/SKILL.md"
 
 # Copy playwright-skill to project (full skill from ralph repo)
 PW_SRC="$RALPH_SRC/skills/playwright-skill"

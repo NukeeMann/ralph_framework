@@ -8,7 +8,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 - `scripts/ralph/ralph.sh` — orkiestrator (867 linii)
 - `scripts/ralph/CLAUDE.md` — instrukcje dla agenta
 - `scripts/ralph/ralph.config` — konfiguracja
-- `scripts/ralph/skills/` — 4 skille (prd_init, prd_append, karpathy-guidelines, playwright-skill)
+- `scripts/ralph/skills/` — 3 skille (prd_init, prd_append, playwright-skill)
 - `init.sh` — bootstrap do projektu
 - `README.md` — dokumentacja
 
@@ -109,7 +109,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 
 ---
 
-## [ ] 6. Usuń `karpathy-guidelines` skill (treść już w CLAUDE.md)
+## [x] 6. Usuń `karpathy-guidelines` skill (treść już w CLAUDE.md)
 
 **Problem:** `skills/karpathy-guidelines/SKILL.md` duplikuje zasady które są już wklejone w `scripts/ralph/CLAUDE.md` (sekcja "Coding Philosophy"). Skill sam w opisie mówi "use this to review the principles". Osobny skill na statyczny dokument to nadmiar.
 

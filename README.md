@@ -135,11 +135,6 @@ Mid-project triage. Reads the existing `prd.json`, takes a rough list of bugs an
 - Bug stories automatically get the test-first criterion: *"A failing test reproducing the bug exists before the fix"*
 - Priorities are assigned relative to existing stories
 
-### `karpathy_guidelines`
-**Trigger:** "karpathy guidelines", "coding philosophy", "coding principles"
-
-Reference for the four behavioral principles applied to every agent iteration: Think Before Coding, Simplicity First, Surgical Changes, Goal-Driven Execution. These are already embedded in `CLAUDE.md` — use this skill for detailed reference or discussion.
-
 ### `playwright-skill`
 **Trigger:** "test website", "check UI", "take screenshot", "browser test"
 
@@ -159,8 +154,7 @@ scripts/ralph/
   skills/
     prd_init/           # New project: questions → prd.json
     prd_append/         # Mid-project: triage bugs/features → append to prd.json
-    karpathy-guidelines/  # Coding philosophy reference
-    playwright-skill/     # Browser automation (Playwright)
+    playwright-skill/   # Browser automation (Playwright)
 ```
 
 ## How Ralph Learns
@@ -176,7 +170,7 @@ Ralph also updates nearby `CLAUDE.md` files in directories it modifies, preservi
 
 ## Coding Philosophy
 
-Every spawned agent follows the Karpathy guidelines embedded in `CLAUDE.md`:
+Every spawned agent follows the principles embedded in `CLAUDE.md`:
 
 - **Think Before Coding** — State assumptions, present interpretations, ask when confused
 - **Simplicity First** — Minimum code that satisfies the story, no speculative abstractions
