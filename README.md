@@ -103,6 +103,12 @@ The project-local copies are what Ralph's orchestrator actually invokes during a
 
 Ralph merges feature branches directly into the base branch and pushes — it does not open pull requests. Code review happens on the base branch post-factum, not per task.
 
+### Parallel execution caveat
+
+`VALIDATE_CMD` runs **per task, in its own worktree, before merge** — not after. With `--parallel 2+`, two tasks can each pass validation in isolation and then be merged into a base branch where their combined changes break the build. Ralph will not re-run validation on the merged state.
+
+If you run with parallelism > 1, treat your base branch's CI (or a manual `VALIDATE_CMD` after a batch) as the real integration gate. For stricter safety, run `--parallel 1` — then per-task validation is also effectively post-merge validation, since tasks merge sequentially.
+
 ## ralph.sh Options
 
 ```

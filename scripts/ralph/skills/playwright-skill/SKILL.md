@@ -30,7 +30,7 @@ General-purpose browser automation skill. I'll write custom Playwright code for 
 
 2. **Write scripts to /tmp** - NEVER write test files to skill directory; always use `/tmp/playwright-test-*.js`
 
-3. **Use visible browser by default** - Always use `headless: false` unless user specifically requests headless mode
+3. **Always use `headless: true`** - Ralph agents run without a display server (WSL2). A visible browser requires an X server that does not exist in this environment; `headless: false` will fail to launch.
 
 4. **Parameterize URLs** - Always make URLs configurable via environment variable or constant at top of script
 
@@ -70,7 +70,7 @@ const { chromium } = require('playwright');
 const TARGET_URL = 'http://localhost:3001'; // <-- Auto-detected or from user
 
 (async () => {
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
 
   await page.goto(TARGET_URL);
@@ -100,7 +100,7 @@ const { chromium } = require('playwright');
 const TARGET_URL = 'http://localhost:3001'; // Auto-detected
 
 (async () => {
-  const browser = await chromium.launch({ headless: false, slowMo: 100 });
+  const browser = await chromium.launch({ headless: true, slowMo: 100 });
   const page = await browser.newPage();
 
   // Desktop test
@@ -126,7 +126,7 @@ const { chromium } = require('playwright');
 const TARGET_URL = 'http://localhost:3001'; // Auto-detected
 
 (async () => {
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
 
   await page.goto(`${TARGET_URL}/login`);
@@ -152,7 +152,7 @@ const { chromium } = require('playwright');
 const TARGET_URL = 'http://localhost:3001'; // Auto-detected
 
 (async () => {
-  const browser = await chromium.launch({ headless: false, slowMo: 50 });
+  const browser = await chromium.launch({ headless: true, slowMo: 50 });
   const page = await browser.newPage();
 
   await page.goto(`${TARGET_URL}/contact`);
@@ -176,7 +176,7 @@ const TARGET_URL = 'http://localhost:3001'; // Auto-detected
 const { chromium } = require('playwright');
 
 (async () => {
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
 
   await page.goto('http://localhost:3000');
@@ -211,7 +211,7 @@ const { chromium } = require('playwright');
 const { chromium } = require('playwright');
 
 (async () => {
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
 
   try {
@@ -243,7 +243,7 @@ const { chromium } = require('playwright');
 const TARGET_URL = 'http://localhost:3001'; // Auto-detected
 
 (async () => {
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
 
   const viewports = [
@@ -283,7 +283,7 @@ For quick one-off tasks, you can execute code inline without creating files:
 ```bash
 # Take a quick screenshot
 cd $SKILL_DIR && node run.js "
-const browser = await chromium.launch({ headless: false });
+const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
 await page.goto('http://localhost:3001');
 await page.screenshot({ path: '/tmp/quick-screenshot.png', fullPage: true });
@@ -387,8 +387,7 @@ For comprehensive Playwright API documentation, see [API_REFERENCE.md](API_REFER
 - **Custom headers** - Use `PW_HEADER_NAME`/`PW_HEADER_VALUE` env vars to identify automated traffic to your backend
 - **Use /tmp for test files** - Write to `/tmp/playwright-test-*.js`, never to skill directory or user's project
 - **Parameterize URLs** - Put detected/provided URL in a `TARGET_URL` constant at the top of every script
-- **DEFAULT: Visible browser** - Always use `headless: false` unless user explicitly asks for headless mode
-- **Headless mode** - Only use `headless: true` when user specifically requests "headless" or "background" execution
+- **Headless required** - Ralph runs in WSL2 with no display server. Always launch with `headless: true`; `headless: false` will fail.
 - **Slow down:** Use `slowMo: 100` to make actions visible and easier to follow
 - **Wait strategies:** Use `waitForURL`, `waitForSelector`, `waitForLoadState` instead of fixed timeouts
 - **Error handling:** Always use try-catch for robust automation
@@ -405,8 +404,8 @@ cd $SKILL_DIR && npm run setup
 **Module not found:**
 Ensure running from skill directory via `run.js` wrapper
 
-**Browser doesn't open:**
-Check `headless: false` and ensure display available
+**Browser doesn't launch (WSL2 / no display):**
+Ensure `headless: true` is set — Ralph environments have no X server available.
 
 **Element not found:**
 Add wait: `await page.waitForSelector('.element', { timeout: 10000 })`
