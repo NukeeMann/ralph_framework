@@ -13,6 +13,9 @@ scripts/ralph/archive/
 # Dependencies
 node_modules/
 
+# Local planning notes (not part of framework)
+TODO.md
+
 # OS
 .DS_Store
 Thumbs.db

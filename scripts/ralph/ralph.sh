@@ -1,7 +1,7 @@
 #!/bin/bash
 # Ralph Loop Orchestrator - parallel task execution with git worktrees
 # Usage: ./ralph.sh [--parallel N] [--max-iterations N]
-set -uo pipefail
+set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,6 +34,13 @@ if [ -z "$STORIES_FIELD" ] && [ -f "$PRD" ]; then
   fi
 elif [ -z "$STORIES_FIELD" ]; then
   STORIES_FIELD="stories"
+fi
+
+# STORIES_FIELD is interpolated into jq queries throughout this script, so it
+# must be a bare identifier — anything else could break queries or worse.
+if ! [[ "$STORIES_FIELD" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then
+  echo "Invalid STORIES_FIELD: '$STORIES_FIELD' (must match [a-zA-Z_][a-zA-Z0-9_]*)" >&2
+  exit 1
 fi
 
 # Defaults
@@ -422,9 +429,18 @@ $recent_progress")"
   # Task cleared validation — drop any stale failure log
   rm -f "$last_failure_file"
 
-  # Push branch
+  # Push branch. Plain push (no --force-with-lease): this branch was just
+  # created from BASE_BRANCH and has no prior remote state to protect against.
   cd "$worktree_dir"
-  git push -u origin "$branch" --force-with-lease 2>/dev/null || git push -u origin "$branch" || true
+  if ! git push -u origin "$branch"; then
+    log_task "$task_id" "${RED}Push failed${RST} — task will be retried"
+    git_lock
+    cd "$REPO_ROOT"
+    git worktree remove "$worktree_dir" --force 2>/dev/null || true
+    git branch -D "$branch" 2>/dev/null || true
+    git_unlock
+    return 1
+  fi
   log_task "$task_id" "Pushed $commits_ahead commit(s) to $branch"
 
   # Cleanup worktree (keep branch for merge)
@@ -496,8 +512,10 @@ merge_tasks() {
         continue
       fi
 
-      # Only auto-resolvable files — safe to resolve
-      # prd.json: always keep ours (orchestrator manages)
+      # Only auto-resolvable files — safe to resolve.
+      # prd.json: agents must not edit it. A conflict here means the
+      # orchestrator updated mark_done on base between when this branch
+      # was cut and when it's merging — keep ours unconditionally.
       git checkout --ours prd.json 2>/dev/null || true
 
       # Lock files / generated files: accept theirs
