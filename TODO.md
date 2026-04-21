@@ -46,7 +46,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 
 ---
 
-## [ ] 3. Feedback validation failure do agenta na retry
+## [x] 3. Feedback validation failure do agenta na retry
 
 **Problem:** Gdy `VALIDATE_CMD` failuje (`ralph.sh` ok. linii 430-445), branch jest kasowany i task idzie na retry. Agent przy retry nie dostaje loga walidacji — zaczyna od zera, ma takie same szanse jak poprzednio.
 

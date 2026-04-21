@@ -358,6 +358,12 @@ run_worker() {
     recent_progress=$(tail -30 "$SCRIPT_DIR/progress.txt" 2>/dev/null || true)
   fi
 
+  local last_failure_file="$LOG_DIR/${task_id}.last_failure.txt"
+  local last_failure=""
+  if [ -f "$last_failure_file" ]; then
+    last_failure=$(cat "$last_failure_file" 2>/dev/null || true)
+  fi
+
   local enriched_prompt
   enriched_prompt="You are Ralph, an autonomous coding agent. Read scripts/ralph/CLAUDE.md and follow ALL instructions there.
 
@@ -370,6 +376,11 @@ ACCEPTANCE CRITERIA:
 $story_criteria")
 $([ -n "$story_tags" ] && echo "
 TAGS: $story_tags")
+$([ -n "$last_failure" ] && echo "
+PREVIOUS ATTEMPT FAILED VALIDATION WITH:
+$last_failure
+
+Fix these issues specifically.")
 
 RULES:
 - Work ONLY on task $task_id. Do NOT touch other stories.
@@ -418,6 +429,7 @@ $recent_progress")"
     eval "$VALIDATE_CMD" > "$logfile.validate" 2>&1 || val_exit=$?
     if [ $val_exit -ne 0 ]; then
       log_task "$task_id" "${BRED}Validation FAILED${RST} (exit $val_exit) — see $logfile.validate"
+      tail -50 "$logfile.validate" > "$last_failure_file" 2>/dev/null || true
       git_lock
       cd "$REPO_ROOT"
       git worktree remove "$worktree_dir" --force 2>/dev/null || true
@@ -427,6 +439,9 @@ $recent_progress")"
     fi
     log_task "$task_id" "${BGREEN}Validation passed${RST}"
   fi
+
+  # Task cleared validation — drop any stale failure log
+  rm -f "$last_failure_file"
 
   # Push branch
   cd "$worktree_dir"
