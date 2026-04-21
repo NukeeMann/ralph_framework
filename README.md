@@ -156,9 +156,9 @@ scripts/ralph/
   CLAUDE.md             # Agent instructions (read by each iteration)
   ralph.config          # Configuration overrides
   prd.json              # Your project's PRD (generated, not committed)
-  progress.txt          # Cumulative progress log (generated)
-  logs/                 # Per-task execution logs
-  archive/              # Archived previous runs
+  progress.txt          # Cumulative progress log (generated, rotated)
+  logs/                 # Per-task execution logs, failed_report.json, last_failure snapshots
+  archive/              # Rotated progress.txt snapshots (Codebase Patterns preserved)
   skills/
     prd_init/           # New project: questions → prd.json
     prd_append/         # Mid-project: triage bugs/features → append to prd.json
@@ -174,7 +174,11 @@ Each iteration appends to `progress.txt` with:
 
 General patterns get consolidated into a `## Codebase Patterns` section at the top of `progress.txt`, which future iterations read first. This gives Ralph a growing understanding of your codebase across iterations.
 
+When `progress.txt` grows past `PROGRESS_ROTATE_LINES` (default 200), older entries are rotated into `archive/progress-YYYY-MM-DD-HHMM.txt`. The `## Codebase Patterns` section is preserved in the live file so that hard-won knowledge survives rotation.
+
 Ralph also updates nearby `CLAUDE.md` files in directories it modifies, preserving module-specific knowledge for future work.
+
+When validation fails, the last 50 lines of the validation log are saved to `logs/<task_id>.last_failure.txt` and injected into the next retry's prompt so the agent can fix the specific error instead of starting from scratch. The file is cleared after the task succeeds.
 
 ## Coding Philosophy
 
