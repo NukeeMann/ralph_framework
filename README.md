@@ -98,8 +98,10 @@ The project-local copies are what Ralph's orchestrator actually invokes during a
 
 | Script | Purpose |
 |--------|---------|
-| `ralph.sh` | Parallel orchestrator with git worktrees, auto-merge, PR creation, retry logic. |
+| `ralph.sh` | Parallel orchestrator with git worktrees, auto-merge, retry logic. |
 | `init.sh` | Bootstraps ralph into a new project. |
+
+Ralph merges feature branches directly into the base branch and pushes — it does not open pull requests. Code review happens on the base branch post-factum, not per task.
 
 ## ralph.sh Options
 
@@ -107,7 +109,6 @@ The project-local copies are what Ralph's orchestrator actually invokes during a
 --parallel N      Run N tasks in parallel (default: 2)
 --max-iterations  Max total iterations (default: 50)
 --max-retries N   Max retries per failed task (default: 2)
---no-pr           Skip PR creation, merge directly
 --model, -m       Claude model: opus, sonnet, haiku (default: opus)
 --base            Base branch (default: current branch)
 ```

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ralph Loop Orchestrator - parallel task execution with git worktrees
-# Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--no-pr]
+# Usage: ./ralph.sh [--parallel N] [--max-iterations N]
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -40,7 +40,6 @@ fi
 PARALLEL=2
 MAX_ITERATIONS=50
 MAX_RETRIES=2
-CREATE_PR=true
 MODEL="opus"  # opus | sonnet | haiku
 BASE_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")"
 
@@ -50,16 +49,14 @@ while [[ $# -gt 0 ]]; do
     --parallel|-p)   PARALLEL="$2"; shift 2 ;;
     --max-iterations) MAX_ITERATIONS="$2"; shift 2 ;;
     --max-retries)   MAX_RETRIES="$2"; shift 2 ;;
-    --no-pr)         CREATE_PR=false; shift ;;
     --model|-m)      MODEL="$2"; shift 2 ;;
     --base)          BASE_BRANCH="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--max-retries N] [--no-pr] [--base BRANCH]"
+      echo "Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--max-retries N] [--base BRANCH]"
       echo ""
       echo "  --parallel N      Run N tasks in parallel (default: 2)"
       echo "  --max-iterations  Max total iterations (default: 50)"
       echo "  --max-retries N   Max retries per failed task (default: 2)"
-      echo "  --no-pr           Skip PR creation, merge directly"
       echo "  --model, -m       Claude model: opus, sonnet, haiku (default: opus)"
       echo "  --base            Base branch (default: current branch)"
       exit 0
@@ -430,17 +427,6 @@ $recent_progress")"
   git push -u origin "$branch" --force-with-lease 2>/dev/null || git push -u origin "$branch" || true
   log_task "$task_id" "Pushed $commits_ahead commit(s) to $branch"
 
-  # Create PR
-  if [ "$CREATE_PR" = true ]; then
-    local t_title
-    t_title=$(jq -r ".${STORIES_FIELD}[] | select(.id == \"$task_id\") | .title" "$PRD")
-    gh pr create \
-      --title "feat: $task_id - $t_title" \
-      --body "Automated by Ralph Loop. Task: $task_id" \
-      --base "$BASE_BRANCH" \
-      --head "$branch" 2>/dev/null || log_task "$task_id" "PR already exists or creation failed"
-  fi
-
   # Cleanup worktree (keep branch for merge)
   git_lock
   cd "$REPO_ROOT"
@@ -537,15 +523,6 @@ merge_tasks() {
     git add prd.json
     git commit -m "chore: mark $task_id done" 2>/dev/null || true
 
-    # Close PR
-    if [ "$CREATE_PR" = true ]; then
-      local pr_number
-      pr_number=$(gh pr list --head "$branch" --json number -q '.[0].number' 2>/dev/null || echo "")
-      if [ -n "$pr_number" ]; then
-        gh pr close "$pr_number" --comment "Merged by Ralph orchestrator" 2>/dev/null || true
-      fi
-    fi
-
     # Cleanup branch
     git branch -D "$branch" 2>/dev/null || true
     git push origin --delete "$branch" 2>/dev/null || true
@@ -561,7 +538,7 @@ merge_tasks() {
 
 total_tasks=$(count_total)
 
-log "Ralph starting | parallel=$PARALLEL model=$MODEL base=$BASE_BRANCH pr=$CREATE_PR tasks=$total_tasks max_iter=$MAX_ITERATIONS max_retry=$MAX_RETRIES"
+log "Ralph starting | parallel=$PARALLEL model=$MODEL base=$BASE_BRANCH tasks=$total_tasks max_iter=$MAX_ITERATIONS max_retry=$MAX_RETRIES"
 if [ -n "$VALIDATE_CMD" ]; then
   log "Validate: $VALIDATE_CMD"
 else
