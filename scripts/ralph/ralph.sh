@@ -98,6 +98,10 @@ echo '[]' > "$FAILED_REPORT"
 # Retry tracking: RETRIES[task_id]=count
 declare -A RETRIES
 
+# PIDs of currently-running workers. Tracked so the SIGINT/SIGTERM handler
+# can tear down their descendants (timeout -> claude -> tee, ...) on Ctrl+C.
+declare -a ACTIVE_PIDS=()
+
 # Minimal colors — only used to tint status words in logs. Works fine on
 # pipes/log files because everything is still readable without the codes.
 RST='\033[0m'
@@ -141,6 +145,40 @@ log_fail() { echo -e "[$(_ts)] ${RED}FAIL${RST} $*"; }
 log_task() {
   local tid="$1"; shift
   echo -e "[$(_ts)] [$tid] $*"
+}
+
+# ============================================================================
+# Signal handling: propagate Ctrl+C to active workers and their subprocesses
+# ============================================================================
+
+# `&` in bash doesn't create a new process group, so `kill -- -$pid` would
+# hit the orchestrator itself. Instead, walk the process tree via `pgrep -P`
+# and signal each node bottom-up. Covers grandchildren (claude -> node/tee).
+kill_tree() {
+  local pid=$1 sig=${2:-TERM}
+  local children
+  children=$(pgrep -P "$pid" 2>/dev/null || true)
+  for child in $children; do
+    kill_tree "$child" "$sig"
+  done
+  kill -"$sig" "$pid" 2>/dev/null || true
+}
+
+cleanup_on_interrupt() {
+  trap '' INT TERM  # don't re-enter while we tear down
+  echo ""
+  log_warn "Interrupted — terminating ${#ACTIVE_PIDS[@]} active worker(s)..."
+  for pid in "${ACTIVE_PIDS[@]}"; do
+    kill_tree "$pid" TERM
+  done
+  sleep 1
+  for pid in "${ACTIVE_PIDS[@]}"; do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill_tree "$pid" KILL
+    fi
+  done
+  rm -rf "$LOCK_DIR" 2>/dev/null || true
+  exit 130
 }
 
 # ============================================================================
@@ -685,6 +723,10 @@ if [[ "${RALPH_TEST_MODE:-0}" == "1" ]]; then
   return 0 2>/dev/null || exit 0
 fi
 
+# Install AFTER the test-mode early-return so bats tests don't inherit the
+# trap when they source this file.
+trap cleanup_on_interrupt INT TERM
+
 log "Ralph starting | parallel=$PARALLEL model=$MODEL mode=$MODE base=$BASE_BRANCH max_iter=$MAX_ITERATIONS max_retry=$MAX_RETRIES"
 if [ -n "$VALIDATE_CMD" ]; then
   log "Validate: $VALIDATE_CMD"
@@ -757,21 +799,23 @@ while [ $iteration -lt $MAX_ITERATIONS ]; do
   done
 
   # Launch workers
-  pids=()
+  ACTIVE_PIDS=()
   local_batch_start=$(date +%s)
   for task_id in "${run_batch[@]}"; do
     run_worker "$task_id" &
-    pids+=($!)
+    ACTIVE_PIDS+=($!)
     iteration=$(( iteration + 1 ))
   done
 
   # Wait for all workers
   failed=()
-  for i in "${!pids[@]}"; do
-    if ! wait "${pids[$i]}"; then
+  for i in "${!ACTIVE_PIDS[@]}"; do
+    if ! wait "${ACTIVE_PIDS[$i]}"; then
       failed+=("${run_batch[$i]}")
     fi
   done
+  # Batch drained — clear so the trap doesn't try to signal exited PIDs.
+  ACTIVE_PIDS=()
 
   batch_elapsed=$(elapsed_since "$local_batch_start")
 
