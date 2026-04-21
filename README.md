@@ -172,7 +172,7 @@ Ralph also updates nearby `CLAUDE.md` files in directories it modifies, preservi
 
 Every spawned agent follows the principles embedded in `CLAUDE.md`:
 
-- **Think Before Coding** — State assumptions, present interpretations, ask when confused
+- **Think Before Coding** — State assumptions in the progress report; on ambiguity pick the conservative interpretation and flag it for the reviewer (agent runs non-interactively, no asking)
 - **Simplicity First** — Minimum code that satisfies the story, no speculative abstractions
 - **Surgical Changes** — Only modify what the story requires, match existing style
-- **Goal-Driven Execution** — Test-first for bugs, verify each acceptance criterion before committing
+- **Goal-Driven Execution** — Test-first for bugs; put the plan in the commit message and progress report, then execute

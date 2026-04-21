@@ -127,7 +127,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 
 ---
 
-## [ ] 7. Pogódź Karpathy "ask when confused" z `--print` mode
+## [x] 7. Pogódź Karpathy "ask when confused" z `--print` mode
 
 **Problem:** `CLAUDE.md` i enriched_prompt każą agentowi "State assumptions, present interpretations, ask when confused, don't guess". Ale Ralph odpala claude w `--print --dangerously-skip-permissions` — one-shot, non-interactive. Agent fizycznie NIE MOŻE zapytać. To cargo-cult instrukcja.
 

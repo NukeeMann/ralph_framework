@@ -74,10 +74,10 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 
 Before writing any code:
 
-- **Think Before Coding** — State your assumptions explicitly. If a request has multiple valid interpretations, present them and ask. If a simpler approach exists, say so before coding the complex one.
+- **Think Before Coding** — State your assumptions explicitly in your progress report. If a request has multiple valid interpretations, pick the most conservative one and flag the ambiguity in `progress.txt` under `**Learnings**` so the human reviewer sees it. You are running non-interactively — do not wait for clarification, but do not silently guess either.
 - **Simplicity First** — Write the minimum code that satisfies the story's acceptance criteria. No speculative abstractions, no unrequested configurability, no "while I'm here" improvements.
 - **Surgical Changes** — Only modify lines that directly address the current story. Match existing code style. Never clean up or refactor code adjacent to your change unless it was orphaned by your change.
-- **Goal-Driven Execution** — For bug fixes, write a test that reproduces the bug before fixing it. For multi-step stories, state a plan with explicit verification steps and confirm before executing.
+- **Goal-Driven Execution** — For bug fixes, write a test that reproduces the bug before fixing it. For multi-step stories, state the plan in your commit message and progress report, then execute it — no interactive confirmation step.
 
 ## Quality Requirements
 
