@@ -401,15 +401,7 @@ $recent_progress")"
   commits_ahead=$(git rev-list "$BASE_BRANCH".."$branch" --count 2>/dev/null || echo "0")
 
   if [ "$commits_ahead" -eq 0 ]; then
-    if [ -n "$(git status --porcelain)" ]; then
-      git add -A
-      git commit -m "feat: $task_id - automated implementation" || true
-      commits_ahead=$(git rev-list "$BASE_BRANCH".."$branch" --count 2>/dev/null || echo "0")
-    fi
-  fi
-
-  if [ "$commits_ahead" -eq 0 ]; then
-    log_task "$task_id" "${YELLOW}No changes produced - skipping${RST}"
+    log_task "$task_id" "${BRED}Agent did not commit${RST} — task will be retried"
     git_lock
     cd "$REPO_ROOT"
     git worktree remove "$worktree_dir" --force 2>/dev/null || true

@@ -28,7 +28,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 
 ---
 
-## [ ] 2. Usuń fallback `git add -A` który maskuje niedokończone zadania
+## [x] 2. Usuń fallback `git add -A` który maskuje niedokończone zadania
 
 **Problem:** W `ralph.sh` (ok. linii 407-417) po uruchomieniu agenta sprawdzany jest `commits_ahead`. Jeśli 0 ale są zmiany w `git status --porcelain`, orchestrator sam robi `git add -A && git commit -m "feat: $task_id - automated implementation"`. To:
 - łapie śmieci z `npm install` (np. zmodyfikowany lockfile)
@@ -86,7 +86,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 - Task-id prefix w logach.
 
 **Akceptacja:**
-- `ralph.sh` ma ≤ 550 linii (z ~867).
+- `ralph.sh` ma ≤ 667 linii (z ~867).
 - Output działa w terminalu bez kolorów też czytelnie.
 - Nie ma spinnera ani ASCII art.
 
