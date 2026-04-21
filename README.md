@@ -48,11 +48,14 @@ The `prd_init` skill will ask up to 10 clarifying questions (problem, users, sta
       "acceptanceCriteria": ["Migration runs", "Typecheck passes"],
       "priority": 1,
       "passes": false,
-      "notes": ""
+      "notes": "",
+      "tags": []
     }
   ]
 }
 ```
+
+Add `"ui"` to a story's `tags` array to enable Playwright browser testing for that task. Without the tag, browser testing is skipped and the Chromium runtime is not installed.
 
 ### Configure (optional)
 
@@ -138,7 +141,9 @@ Mid-project triage. Reads the existing `prd.json`, takes a rough list of bugs an
 ### `playwright-skill`
 **Trigger:** "test website", "check UI", "take screenshot", "browser test"
 
-Browser automation via Playwright. Auto-detects running dev servers, writes test scripts to `/tmp`, executes via `run.js`. Used automatically by Ralph agents when stories involve UI changes (detected via `ui` tag or HTML/CSS/template changes). Runs headless in Ralph mode (WSL2).
+Browser automation via Playwright. Auto-detects running dev servers, writes test scripts to `/tmp`, executes via `run.js`. Runs headless in Ralph mode (WSL2).
+
+**Activation is tag-driven:** Ralph runs the skill only when the current task has `"tags": ["ui"]` in `prd.json`. The Chromium runtime (~300MB) is installed lazily on the first UI task, not up-front — backend-only projects never pay the cost. Files touched by a task do **not** trigger browser testing on their own; the tag is the sole switch.
 
 ## Directory Structure
 

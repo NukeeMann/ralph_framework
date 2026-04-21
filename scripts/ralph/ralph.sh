@@ -242,15 +242,6 @@ run_worker() {
     log_task "$task_id" "Dependency install failed (check $logfile.npm)"
   }
 
-  # Install playwright-skill runtime in worktree if skill exists but node_modules missing
-  local pw_skill_dir="$worktree_dir/scripts/ralph/skills/playwright-skill"
-  if [ -f "$pw_skill_dir/package.json" ] && [ ! -d "$pw_skill_dir/node_modules" ]; then
-    log_task "$task_id" "Installing playwright-skill runtime..."
-    (cd "$pw_skill_dir" && npm run setup 2>&1) > "$logfile.pw" 2>&1 || {
-      log_task "$task_id" "playwright-skill setup failed (check $logfile.pw)"
-    }
-  fi
-
   # Build enriched prompt with story context
   local story_json
   story_json=$(jq -r ".${STORIES_FIELD}[] | select(.id == \"$task_id\")" "$PRD" 2>/dev/null)
@@ -272,6 +263,24 @@ run_worker() {
       if (.tags | type) == "array" then .tags | join(", ")
       else .tags end
     else empty end')
+
+  # Lazy playwright-skill setup: only when THIS task has tag `ui`.
+  # Chromium download (~300MB) is deferred until actually needed.
+  # Flock serializes parallel UI tasks so chromium cache isn't fetched twice.
+  if echo "$story_tags" | grep -qw "ui"; then
+    local pw_skill_dir="$worktree_dir/scripts/ralph/skills/playwright-skill"
+    if [ -f "$pw_skill_dir/package.json" ] && [ ! -d "$pw_skill_dir/node_modules" ]; then
+      local pw_lock_file="$LOCK_DIR/playwright-setup.lock"
+      log_task "$task_id" "Task has tag 'ui' — installing playwright-skill runtime..."
+      (
+        exec {pw_fd}>"$pw_lock_file"
+        flock -x "$pw_fd"
+        (cd "$pw_skill_dir" && npm run setup 2>&1)
+      ) > "$logfile.pw" 2>&1 || {
+        log_task "$task_id" "playwright-skill setup failed (check $logfile.pw)"
+      }
+    fi
+  fi
 
   local recent_progress=""
   if [ -f "$SCRIPT_DIR/progress.txt" ]; then

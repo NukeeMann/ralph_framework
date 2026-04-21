@@ -49,7 +49,8 @@ fi
 cp "$RALPH_SRC/skills/prd_init/SKILL.md" "$RALPH_DST/skills/prd_init/SKILL.md"
 cp "$RALPH_SRC/skills/prd_append/SKILL.md" "$RALPH_DST/skills/prd_append/SKILL.md"
 
-# Copy playwright-skill to project (full skill from ralph repo)
+# Copy playwright-skill files (small). npm + chromium is installed lazily
+# by ralph.sh when the first task with tag `ui` runs.
 PW_SRC="$RALPH_SRC/skills/playwright-skill"
 PW_DST="$RALPH_DST/skills/playwright-skill"
 mkdir -p "$PW_DST/lib"
@@ -58,16 +59,6 @@ cp "$PW_SRC/API_REFERENCE.md" "$PW_DST/API_REFERENCE.md"
 cp "$PW_SRC/run.js" "$PW_DST/run.js"
 cp "$PW_SRC/package.json" "$PW_DST/package.json"
 cp "$PW_SRC/lib/helpers.js" "$PW_DST/lib/helpers.js"
-
-# Install playwright runtime (npm + chromium) if not already set up
-if [ ! -d "$PW_DST/node_modules" ]; then
-  echo "  Installing playwright runtime (npm + chromium)..."
-  (cd "$PW_DST" && npm run setup 2>&1) || {
-    echo "  Warning: playwright setup failed — run manually: cd $PW_DST && npm run setup"
-  }
-else
-  echo "  playwright-skill runtime already installed"
-fi
 
 # Make scripts executable
 chmod +x "$RALPH_DST/ralph.sh"

@@ -143,7 +143,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 
 ---
 
-## [ ] 8. Playwright opt-in, nie domyślny
+## [x] 8. Playwright opt-in, nie domyślny
 
 **Problem:** `init.sh` kopiuje playwright-skill do każdego projektu i odpala `npm run setup` który ściąga Chromium (~300MB). Nie każdy projekt to UI.
 

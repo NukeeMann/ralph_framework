@@ -89,7 +89,8 @@ Wait for answers before proceeding. It's fine to batch questions for multiple it
   ],
   "priority": 8,
   "passes": false,
-  "notes": "Reproduction: [how to trigger the bug]"
+  "notes": "Reproduction: [how to trigger the bug]",
+  "tags": []
 }
 ```
 
@@ -107,9 +108,12 @@ Wait for answers before proceeding. It's fine to batch questions for multiple it
   ],
   "priority": 9,
   "passes": false,
-  "notes": ""
+  "notes": "",
+  "tags": []
 }
 ```
+
+**Tags:** Add `"ui"` for any story that renders or modifies user-facing HTML/CSS/components/pages. The orchestrator uses this tag (and only this tag) to decide whether to install Playwright and require browser verification. Without `"ui"`, browser testing is skipped even if the story touches templates.
 
 ---
 
@@ -190,7 +194,7 @@ Ask the user if priority is unclear: *"Does this bug block any current stories, 
 - [ ] Classified each item (bug / feature / enhancement)
 - [ ] Asked clarifying questions for ambiguous items
 - [ ] Bug stories have test-first criterion
-- [ ] UI stories have browser verification criterion
+- [ ] UI stories have browser verification criterion AND `"tags": ["ui"]`
 - [ ] All stories have "Typecheck passes"
 - [ ] Each story is small enough for one iteration (split if not)
 - [ ] Priorities assigned relative to existing stories

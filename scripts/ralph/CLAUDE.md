@@ -88,7 +88,7 @@ Before writing any code:
 
 ## Browser Testing (Required for UI Stories)
 
-When a story changes UI (HTML, CSS, templates, components, pages, layouts, or has tag `ui`), you MUST verify it in a browser using the playwright-skill before committing.
+If your task has tag `ui`, you MUST verify it in a browser using the playwright-skill before committing. If the tag is absent, skip browser testing entirely — even if the change touches HTML/CSS. Tag is the single source of truth; the orchestrator only installs the playwright runtime when the tag is present.
 
 The playwright-skill is located at `scripts/ralph/skills/playwright-skill/` in the project. Use this path for all commands below.
 
@@ -115,8 +115,7 @@ The playwright-skill is located at `scripts/ralph/skills/playwright-skill/` in t
 
 ### When to skip
 
-- Story only changes backend logic, APIs, or database
-- Story only changes config, docs, or tests
+- Task has no `ui` tag — skip browser testing regardless of files touched
 - No dev server can be started (note in progress report)
 
 Include test results and screenshot paths in your progress report.

@@ -105,11 +105,14 @@ Write directly to `scripts/ralph/prd.json` (or `prd.json` in root if configured)
       ],
       "priority": 1,
       "passes": false,
-      "notes": ""
+      "notes": "",
+      "tags": []
     }
   ]
 }
 ```
+
+**Tags:** Add `"ui"` to `tags` for every story that renders or modifies user-facing HTML/CSS/components/pages. The orchestrator uses this tag (and only this tag) to decide whether to install Playwright and require browser verification. Stories without `"ui"` will not trigger browser testing even if they touch templates.
 
 ---
 
@@ -175,7 +178,7 @@ Before writing prd.json, check if one already exists:
 - [ ] Each story is completable in one iteration
 - [ ] Stories ordered by dependency (schema → backend → UI)
 - [ ] Every story has "Typecheck passes"
-- [ ] UI stories have "Verify in browser" criterion
+- [ ] UI stories have "Verify in browser" criterion AND `"tags": ["ui"]`
 - [ ] Bug stories have test-first criterion
 - [ ] Archived previous prd.json if branchName differs
 - [ ] Wrote to `scripts/ralph/prd.json`
