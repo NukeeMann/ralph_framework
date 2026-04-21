@@ -84,61 +84,6 @@ fi
 # Initialize empty failed report
 echo '[]' > "$RALPH_DST/logs/failed_report.json"
 
-# Install ralph-framework as a Claude Code plugin (user scope)
-PLUGIN_CACHE="$HOME/.claude/plugins/cache/local/ralph-framework/1.0.0"
-INSTALLED_PLUGINS="$HOME/.claude/plugins/installed_plugins.json"
-
-if [ ! -d "$PLUGIN_CACHE" ]; then
-  mkdir -p "$PLUGIN_CACHE/skills/prd_init"
-  mkdir -p "$PLUGIN_CACHE/skills/prd_append"
-  mkdir -p "$PLUGIN_CACHE/skills/karpathy-guidelines"
-  mkdir -p "$PLUGIN_CACHE/skills/playwright-skill"
-  mkdir -p "$PLUGIN_CACHE/.claude-plugin"
-
-  cp "$RALPH_SRC/skills/prd_init/SKILL.md" "$PLUGIN_CACHE/skills/prd_init/SKILL.md"
-  cp "$RALPH_SRC/skills/prd_append/SKILL.md" "$PLUGIN_CACHE/skills/prd_append/SKILL.md"
-  cp "$RALPH_SRC/skills/karpathy-guidelines/SKILL.md" "$PLUGIN_CACHE/skills/karpathy-guidelines/SKILL.md"
-  cp "$RALPH_SRC/skills/playwright-skill/SKILL.md" "$PLUGIN_CACHE/skills/playwright-skill/SKILL.md"
-  cat > "$PLUGIN_CACHE/.claude-plugin/plugin.json" << 'JSON'
-{
-  "name": "ralph-framework",
-  "version": "1.0.0",
-  "description": "Ralph autonomous coding agent: prd_init, prd_append, karpathy-guidelines, playwright-skill skills."
-}
-JSON
-
-  # Register plugin in installed_plugins.json
-  if [ -f "$INSTALLED_PLUGINS" ]; then
-    python3 - "$INSTALLED_PLUGINS" "$PLUGIN_CACHE" << 'PYEOF'
-import json, sys
-path, install_path = sys.argv[1], sys.argv[2]
-with open(path) as f:
-    data = json.load(f)
-data.setdefault("plugins", {})["ralph-framework@local"] = [{
-    "scope": "user",
-    "installPath": install_path,
-    "version": "1.0.0",
-    "installedAt": __import__('datetime').datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.000Z'),
-    "lastUpdated": __import__('datetime').datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.000Z'),
-    "projectPath": None
-}]
-with open(path, 'w') as f:
-    json.dump(data, f, indent=2)
-PYEOF
-    echo "  Installed ralph-framework plugin (restart Claude Code to activate skills)"
-  else
-    echo "  Warning: $INSTALLED_PLUGINS not found — install Claude Code first"
-  fi
-else
-  # Update skill files in existing cache
-  cp "$RALPH_SRC/skills/prd_init/SKILL.md" "$PLUGIN_CACHE/skills/prd_init/SKILL.md"
-  cp "$RALPH_SRC/skills/prd_append/SKILL.md" "$PLUGIN_CACHE/skills/prd_append/SKILL.md"
-  cp "$RALPH_SRC/skills/karpathy-guidelines/SKILL.md" "$PLUGIN_CACHE/skills/karpathy-guidelines/SKILL.md"
-  mkdir -p "$PLUGIN_CACHE/skills/playwright-skill"
-  cp "$RALPH_SRC/skills/playwright-skill/SKILL.md" "$PLUGIN_CACHE/skills/playwright-skill/SKILL.md"
-  echo "  Updated ralph-framework plugin skills"
-fi
-
 # Add recommended .gitignore entries
 GITIGNORE="$TARGET/.gitignore"
 RALPH_IGNORES=(".worktrees/" ".ralph-locks/")
@@ -171,8 +116,9 @@ echo ""
 echo "Ralph Framework installed successfully!"
 echo ""
 echo "Next steps:"
-echo "  1. Restart Claude Code to activate prd_init, prd_append, karpathy-guidelines, playwright-skill skills"
-echo "  2. Edit scripts/ralph/ralph.config to configure PRD location & stories field"
-echo "  3. New project: use the 'prd_init' skill in Claude Code"
-echo "  4. Mid-project bugs/features: use the 'prd_append' skill in Claude Code"
-echo "  5. Run orchestrator: ./scripts/ralph/ralph.sh --parallel 2 --tool claude"
+echo "  1. Edit scripts/ralph/ralph.config to configure PRD location & stories field"
+echo "  2. New project: use the 'prd_init' skill in Claude Code"
+echo "  3. Mid-project bugs/features: use the 'prd_append' skill in Claude Code"
+echo "  4. Run orchestrator: ./scripts/ralph/ralph.sh --parallel 2"
+echo ""
+echo "Skills are project-local (scripts/ralph/skills/). For global install, see README."

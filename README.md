@@ -78,6 +78,19 @@ VALIDATE_CMD="npm run build && npm test"
 ./scripts/ralph/ralph.sh --parallel 2 --model opus
 ```
 
+### Manual skill installation (optional)
+
+Skills live in `scripts/ralph/skills/` per project. `init.sh` does **not** install them into your user-scope Claude Code (`~/.claude/`). If you want skills like `prd_init` / `prd_append` available globally across all projects, copy them yourself:
+
+```bash
+mkdir -p ~/.claude/skills
+cp -r scripts/ralph/skills/prd_init ~/.claude/skills/
+cp -r scripts/ralph/skills/prd_append ~/.claude/skills/
+# Restart Claude Code to pick them up.
+```
+
+The project-local copies are what Ralph's orchestrator actually invokes during agent runs, so the global copy is only for convenience when using skills interactively.
+
 ## Scripts
 
 | Script | Purpose |

@@ -92,7 +92,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 
 ---
 
-## [ ] 5. Usuń plugin-installation hack w init.sh
+## [x] 5. Usuń plugin-installation hack w init.sh
 
 **Problem:** `init.sh` (linie ~87-140) ręcznie manipuluje `~/.claude/plugins/cache/local/ralph-framework/1.0.0/` i edytuje `~/.claude/plugins/installed_plugins.json` przez inline Python. To kruche, undocumented API Claude Code. Dodatkowo skille są kopiowane 2× (do projektu + do plugin cache) — niejasne która wersja wygrywa.
 
