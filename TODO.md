@@ -67,7 +67,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 
 ---
 
-## [ ] 4. Wytnij kosmetykę z ralph.sh
+## [x] 4. Wytnij kosmetykę z ralph.sh
 
 **Problem:** ~200 linii w `ralph.sh` to wyłącznie UX dla człowieka który i tak nie ogląda. Ralph działa godzinami w tle. Nikomu nie potrzebny jest spinner i merge-box.
 
@@ -143,31 +143,7 @@ Lista uporządkowanych zadań do wykonania na Ralph Framework. Każda sekcja jes
 
 ---
 
-## [ ] 8. Dedupe `enriched_prompt` vs CLAUDE.md
-
-**Problem:** `run_worker` buduje duży `enriched_prompt` ze story_title, story_desc, acceptance_criteria, tags, recent_progress. Ale `CLAUDE.md` już każe agentowi "read prd.json, check RALPH_TASK_ID, read progress.txt". Agent dostaje te same info dwa razy.
-
-**Do zrobienia — wybierz jedną ścieżkę:**
-
-**Opcja A (preferowana — prosty prompt):** Uprość `enriched_prompt` do:
-```
-You are Ralph. Read scripts/ralph/CLAUDE.md and follow it.
-RALPH_TASK_ID=$task_id
-```
-Agent sam wyciągnie story z prd.json i progress.txt z pliku. Mniej duplikacji, mniej tokenów.
-
-**Opcja B (inline kontekst, wywal plik-reading):** Zostaw `enriched_prompt` z task context, ale w `CLAUDE.md` USUŃ instrukcje "read prd.json, read progress.txt — pick story" — bo to jest już w prompcie. CLAUDE.md skupia się wtedy tylko na ZASADACH (jak pisać kod, jak commitować), nie na task-picking.
-
-Wybierz A. Jest prostsze i trzyma "source of truth" w prd.json + CLAUDE.md, zamiast w bash heredocu.
-
-**Akceptacja:**
-- `enriched_prompt` w ralph.sh ma ≤ 5 linii.
-- CLAUDE.md jest jedynym miejscem z instrukcjami jak agent ma czytać prd.json i progress.txt.
-- `recent_progress` z tail -30 zostaje wyrzucone z bash-a (agent czyta plik sam).
-
----
-
-## [ ] 9. Playwright opt-in, nie domyślny
+## [ ] 8. Playwright opt-in, nie domyślny
 
 **Problem:** `init.sh` kopiuje playwright-skill do każdego projektu i odpala `npm run setup` który ściąga Chromium (~300MB). Nie każdy projekt to UI.
 
@@ -184,7 +160,7 @@ Wybierz A. Jest prostsze i trzyma "source of truth" w prd.json + CLAUDE.md, zami
 
 ---
 
-## [ ] 10. Timeout per task + rotacja progress.txt
+## [ ] 9. Timeout per task + rotacja progress.txt
 
 **Problem 1:** Brak timeoutu — agent może utknąć na godzinę. Przy opus to drogo.
 **Problem 2:** `progress.txt` rośnie nieograniczenie. Agent czyta tail -30 ale sam plik może mieć 5000 linii.
@@ -210,7 +186,7 @@ Wybierz A. Jest prostsze i trzyma "source of truth" w prd.json + CLAUDE.md, zami
 
 ---
 
-## [ ] 11. `get_pending_tasks` — pozwól na cross-priority parallelism
+## [ ] 10. `get_pending_tasks` — pozwól na cross-priority parallelism
 
 **Problem:** Funkcja bierze tylko taski z `min_priority`. Przy `[priority=1, priority=2, priority=3]` i `--parallel 4` polecą tylko taski z priority=1. Równoległość marnowana.
 
@@ -229,7 +205,7 @@ Wybierz A. Jest prostsze i trzyma "source of truth" w prd.json + CLAUDE.md, zami
 
 ---
 
-## [ ] 12. Napraw PR workflow albo go usuń
+## [ ] 11. Napraw PR workflow albo go usuń
 
 **Problem:** Orchestrator tworzy PR przez `gh pr create`, potem mergeuje lokalnie i robi `gh pr close` z komentarzem "Merged by Ralph". `gh pr close` zostawia PR w stanie **closed, NOT merged** — na liście GitHub wygląda jak anulowany. Workflow PR-owy traci wartość.
 
@@ -253,7 +229,7 @@ Wybierz B jeśli chcesz mniej kodu, A jeśli chcesz trzymać audit trail.
 
 ---
 
-## [ ] 13. Polish — drobne poprawki higieny
+## [ ] 12. Polish — drobne poprawki higieny
 
 **Do zrobienia w jednym commit:**
 
@@ -270,7 +246,7 @@ Wybierz B jeśli chcesz mniej kodu, A jeśli chcesz trzymać audit trail.
 
 ---
 
-## [ ] 14. Aktualizacja README pod kątem wszystkich zmian
+## [ ] 13. Aktualizacja README pod kątem wszystkich zmian
 
 **Problem:** Po wszystkich cięciach README będzie nieaktualny.
 
@@ -291,12 +267,3 @@ Wybierz B jeśli chcesz mniej kodu, A jeśli chcesz trzymać audit trail.
 - Sekcja Configuration jest kompletna.
 
 ---
-
-## Kolejność wykonania (rekomendacja)
-
-1. Najpierw **zepsute** (sekcje 1-3) — usuwa kłamstwa z projektu.
-2. Potem **redukcja** (4-6) — tnie kod i duplikację.
-3. Potem **spójność filozofii** (7-8) — dopasuj instrukcje do runtime.
-4. Potem **opcjonalność i safety** (9-10) — playwright opt-in, timeouty.
-5. Potem **ulepszenia** (11-12) — parallelism, PRy.
-6. Na końcu **polish + docs** (13-14).

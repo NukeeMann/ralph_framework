@@ -76,30 +76,12 @@ echo '[]' > "$FAILED_REPORT"
 # Retry tracking: RETRIES[task_id]=count
 declare -A RETRIES
 
-# ============================================================================
-# Colors & Symbols
-# ============================================================================
+# Minimal colors — only used to tint status words in logs. Works fine on
+# pipes/log files because everything is still readable without the codes.
 RST='\033[0m'
-BOLD='\033[1m'
-DIM='\033[2m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
-CYAN='\033[0;36m'
-WHITE='\033[0;37m'
-BRED='\033[1;31m'
-BGREEN='\033[1;32m'
-BYELLOW='\033[1;33m'
-BBLUE='\033[1;34m'
-BMAGENTA='\033[1;35m'
-BCYAN='\033[1;36m'
-BWHITE='\033[1;37m'
-BG_GREEN='\033[42m'
-BG_RED='\033[41m'
-BG_BLUE='\033[44m'
-BG_YELLOW='\033[43m'
 
 SCRIPT_START=$(date +%s)
 
@@ -128,77 +110,15 @@ elapsed_since() {
   fi
 }
 
-progress_bar() {
-  local completed=$1
-  local total=$2
-  local width=30
-  local filled=0
-  if [ "$total" -gt 0 ]; then
-    filled=$(( completed * width / total ))
-  fi
-  local empty=$(( width - filled ))
-  local pct=0
-  if [ "$total" -gt 0 ]; then
-    pct=$(( completed * 100 / total ))
-  fi
-  printf "${BGREEN}"
-  for ((pb_i=0; pb_i<filled; pb_i++)); do printf '#'; done
-  printf "${DIM}"
-  for ((pb_i=0; pb_i<empty; pb_i++)); do printf '-'; done
-  printf "${RST} ${BOLD}%3d%%${RST}" "$pct"
-}
-
-# Spinner for background waits
-SPINNER_PID=""
-start_spinner() {
-  local msg="$1"
-  (
-    local frames=('|' '/' '-' '\')
-    local i=0
-    while true; do
-      printf "\r  ${CYAN}%s${RST} %s " "${frames[$i]}" "$msg" >&2
-      i=$(( (i + 1) % ${#frames[@]} ))
-      sleep 0.12
-    done
-  ) &
-  SPINNER_PID=$!
-  disown "$SPINNER_PID" 2>/dev/null
-}
-
-stop_spinner() {
-  if [ -n "$SPINNER_PID" ]; then
-    kill "$SPINNER_PID" 2>/dev/null
-    wait "$SPINNER_PID" 2>/dev/null || true
-    SPINNER_PID=""
-    printf "\r\033[K" >&2
-  fi
-}
-
-# ============================================================================
-# Logging helpers
-# ============================================================================
-_ts() { printf "${DIM}[%s]${RST}" "$(date '+%H:%M:%S')"; }
-
-log()       { echo -e "$(_ts) $*"; }
-log_info()  { echo -e "$(_ts) ${CYAN}*${RST}  $*"; }
-log_ok()    { echo -e "$(_ts) ${BGREEN}OK${RST} $*"; }
-log_warn()  { echo -e "$(_ts) ${BYELLOW}!!${RST} $*"; }
-log_fail()  { echo -e "$(_ts) ${BRED}FAIL${RST} $*"; }
-log_step()  { echo -e "$(_ts) ${BBLUE}->${RST} $*"; }
-log_task()  {
+# Logging helpers — 4 levels, timestamped, colour-tagged but readable without.
+_ts() { date '+%H:%M:%S'; }
+log()      { echo -e "[$(_ts)] $*"; }
+log_ok()   { echo -e "[$(_ts)] ${GREEN}OK${RST}   $*"; }
+log_warn() { echo -e "[$(_ts)] ${YELLOW}WARN${RST} $*"; }
+log_fail() { echo -e "[$(_ts)] ${RED}FAIL${RST} $*"; }
+log_task() {
   local tid="$1"; shift
-  local ttl
-  ttl=$(task_title "$tid")
-  echo -e "$(_ts) ${BMAGENTA}[$tid]${RST} ${DIM}$ttl${RST}  $*"
-}
-
-# Horizontal rule
-hr() {
-  local char="${1:-=}"
-  local color="${2:-$DIM}"
-  printf "${color}"
-  printf '%*s' 60 '' | tr ' ' "$char"
-  printf "${RST}\n"
+  echo -e "[$(_ts)] [$tid] $*"
 }
 
 # ============================================================================
@@ -300,7 +220,7 @@ run_worker() {
   local worker_start
   worker_start=$(date +%s)
 
-  log_task "$task_id" "${BBLUE}Starting${RST} -> branch: ${CYAN}$branch${RST}"
+  log_task "$task_id" "Starting -> branch: $branch"
 
   # Serialize git setup (branch + worktree creation)
   git_lock
@@ -317,17 +237,17 @@ run_worker() {
 
   # Install dependencies in the worktree
   cd "$worktree_dir"
-  log_task "$task_id" "${CYAN}Installing dependencies...${RST}"
+  log_task "$task_id" "Installing dependencies..."
   eval "$INSTALL_CMD" > "$logfile.npm" 2>&1 || {
-    log_task "$task_id" "${BYELLOW}Dependency install failed (check $logfile.npm)${RST}"
+    log_task "$task_id" "Dependency install failed (check $logfile.npm)"
   }
 
   # Install playwright-skill runtime in worktree if skill exists but node_modules missing
   local pw_skill_dir="$worktree_dir/scripts/ralph/skills/playwright-skill"
   if [ -f "$pw_skill_dir/package.json" ] && [ ! -d "$pw_skill_dir/node_modules" ]; then
-    log_task "$task_id" "${CYAN}Installing playwright-skill runtime...${RST}"
+    log_task "$task_id" "Installing playwright-skill runtime..."
     (cd "$pw_skill_dir" && npm run setup 2>&1) > "$logfile.pw" 2>&1 || {
-      log_task "$task_id" "${BYELLOW}playwright-skill setup failed (check $logfile.pw)${RST}"
+      log_task "$task_id" "playwright-skill setup failed (check $logfile.pw)"
     }
   fi
 
@@ -392,7 +312,7 @@ RECENT PROGRESS (from prior iterations):
 $recent_progress")"
 
   # Run claude in worktree
-  log_task "$task_id" "${BCYAN}Running claude${RST} in worktree..."
+  log_task "$task_id" "Running claude in worktree..."
 
   local exit_code=0
   RALPH_TASK_ID="$task_id" stdbuf -oL claude \
@@ -403,7 +323,7 @@ $recent_progress")"
     2>&1 | tee "$logfile" || exit_code=$?
 
   if [ $exit_code -ne 0 ]; then
-    log_task "$task_id" "${BYELLOW}!!${RST} claude exited with code ${BRED}$exit_code${RST} (check $logfile)"
+    log_task "$task_id" "claude exited with code $exit_code (check $logfile)"
   fi
 
   # Check if there are any commits on this branch beyond base
@@ -412,7 +332,7 @@ $recent_progress")"
   commits_ahead=$(git rev-list "$BASE_BRANCH".."$branch" --count 2>/dev/null || echo "0")
 
   if [ "$commits_ahead" -eq 0 ]; then
-    log_task "$task_id" "${BRED}Agent did not commit${RST} — task will be retried"
+    log_task "$task_id" "${RED}Agent did not commit${RST} — task will be retried"
     git_lock
     cd "$REPO_ROOT"
     git worktree remove "$worktree_dir" --force 2>/dev/null || true
@@ -423,12 +343,12 @@ $recent_progress")"
 
   # Validation gate: run VALIDATE_CMD before allowing merge
   if [ -n "$VALIDATE_CMD" ]; then
-    log_task "$task_id" "${BCYAN}Validating${RST} (${DIM}$VALIDATE_CMD${RST})..."
+    log_task "$task_id" "Validating ($VALIDATE_CMD)..."
     cd "$worktree_dir"
     local val_exit=0
     eval "$VALIDATE_CMD" > "$logfile.validate" 2>&1 || val_exit=$?
     if [ $val_exit -ne 0 ]; then
-      log_task "$task_id" "${BRED}Validation FAILED${RST} (exit $val_exit) — see $logfile.validate"
+      log_task "$task_id" "${RED}Validation FAILED${RST} (exit $val_exit) — see $logfile.validate"
       tail -50 "$logfile.validate" > "$last_failure_file" 2>/dev/null || true
       git_lock
       cd "$REPO_ROOT"
@@ -437,7 +357,7 @@ $recent_progress")"
       git_unlock
       return 1
     fi
-    log_task "$task_id" "${BGREEN}Validation passed${RST}"
+    log_task "$task_id" "${GREEN}Validation passed${RST}"
   fi
 
   # Task cleared validation — drop any stale failure log
@@ -446,7 +366,7 @@ $recent_progress")"
   # Push branch
   cd "$worktree_dir"
   git push -u origin "$branch" --force-with-lease 2>/dev/null || git push -u origin "$branch" || true
-  log_task "$task_id" "${GREEN}Pushed${RST} ${BWHITE}$commits_ahead${RST} commit(s) to ${CYAN}$branch${RST}"
+  log_task "$task_id" "Pushed $commits_ahead commit(s) to $branch"
 
   # Create PR
   if [ "$CREATE_PR" = true ]; then
@@ -456,7 +376,7 @@ $recent_progress")"
       --title "feat: $task_id - $t_title" \
       --body "Automated by Ralph Loop. Task: $task_id" \
       --base "$BASE_BRANCH" \
-      --head "$branch" 2>/dev/null || log_task "$task_id" "${YELLOW}PR already exists or creation failed${RST}"
+      --head "$branch" 2>/dev/null || log_task "$task_id" "PR already exists or creation failed"
   fi
 
   # Cleanup worktree (keep branch for merge)
@@ -467,120 +387,8 @@ $recent_progress")"
 
   local elapsed
   elapsed=$(elapsed_since "$worker_start")
-  log_task "$task_id" "${BGREEN}Done${RST} ${DIM}($elapsed)${RST}"
+  log_task "$task_id" "${GREEN}Done${RST} ($elapsed)"
   return 0
-}
-
-# ============================================================================
-# Merge diff box - shows changes after each merge in a colored frame
-# ============================================================================
-
-print_merge_box() {
-  local task_id="$1"
-  local branch="$2"
-  local merge_type="$3"  # "clean" or "conflict"
-
-  local t_title
-  t_title=$(task_title "$task_id")
-
-  # Get commit messages from the merged branch (skip merge commit itself)
-  local commit_msgs
-  commit_msgs=$(git log HEAD~1..HEAD --no-merges --format='%s' 2>/dev/null || true)
-  if [ -z "$commit_msgs" ]; then
-    commit_msgs=$(git log HEAD^2 --not HEAD^1 --format='%s' 2>/dev/null | head -5 || true)
-  fi
-
-  # Extract ralph progress summary for this task from progress.txt
-  local progress_file="$SCRIPT_DIR/progress.txt"
-  local ralph_summary=""
-  if [ -f "$progress_file" ]; then
-    ralph_summary=$(awk -v tid="$task_id" '
-      BEGIN { found=0 }
-      /^## / && index($0, tid) { found=1; next }
-      found && /^## / { exit }
-      found && /^---/ { exit }
-      found && /^- \*\*Learnings/ { exit }
-      found && /^- Files changed/ { exit }
-      found && /^- / { print }
-    ' "$progress_file" | head -8)
-  fi
-
-  # Shortstat summary
-  local shortstat
-  shortstat=$(git diff --shortstat HEAD~1 HEAD -- . ':!prd.json' 2>/dev/null || true)
-
-  # PRD task priority
-  local priority
-  priority=$(jq -r ".${STORIES_FIELD}[] | select(.id == \"$task_id\") | .priority" "$PRD" 2>/dev/null || echo "?")
-
-  # Box color based on merge type
-  local box_color="$GREEN"
-  local status_label="${BGREEN}MERGED${RST}"
-  if [ "$merge_type" = "conflict" ]; then
-    box_color="$YELLOW"
-    status_label="${BYELLOW}MERGED (conflicts resolved)${RST}"
-  fi
-
-  local box_w=70
-  local inner_w=$(( box_w - 6 ))
-
-  echo ""
-  # Top border
-  printf "    ${box_color}+"; printf '%*s' "$((box_w - 2))" '' | tr ' ' '-'; printf "+${RST}\n"
-
-  # Status + Task ID + priority
-  printf "    ${box_color}|${RST} %b  ${BMAGENTA}%s${RST}  ${DIM}(priority %s)${RST}%*s${box_color}|${RST}\n" \
-    "$status_label" "$task_id" "$priority" "1" ""
-
-  # Task title
-  printf "    ${box_color}|${RST} ${BWHITE}%s${RST}%*s${box_color}|${RST}\n" \
-    "$t_title" "1" ""
-
-  # Separator
-  printf "    ${box_color}|"; printf '%*s' "$((box_w - 2))" '' | tr ' ' '-'; printf "|${RST}\n"
-
-  # Ralph progress summary
-  if [ -n "$ralph_summary" ]; then
-    printf "    ${box_color}|${RST} ${BOLD}What was done:${RST}%*s${box_color}|${RST}\n" "1" ""
-    while IFS= read -r sline; do
-      [ -z "$sline" ] && continue
-      # Strip leading "- "
-      sline="${sline#- }"
-      if [ ${#sline} -gt $inner_w ]; then
-        sline="${sline:0:$((inner_w - 3))}..."
-      fi
-      printf "    ${box_color}|${RST}   ${CYAN}%s${RST}%*s${box_color}|${RST}\n" "$sline" "1" ""
-    done <<< "$ralph_summary"
-  fi
-
-  # Commit messages (only if different from summary / as fallback)
-  if [ -n "$commit_msgs" ]; then
-    printf "    ${box_color}|"; printf '%*s' "$((box_w - 2))" '' | tr ' ' '-'; printf "|${RST}\n"
-    printf "    ${box_color}|${RST} ${BOLD}Commits:${RST}%*s${box_color}|${RST}\n" "1" ""
-    while IFS= read -r msg; do
-      [ -z "$msg" ] && continue
-      if [ ${#msg} -gt $inner_w ]; then
-        msg="${msg:0:$((inner_w - 3))}..."
-      fi
-      printf "    ${box_color}|${RST}   ${DIM}%s${RST}%*s${box_color}|${RST}\n" "$msg" "1" ""
-    done <<< "$commit_msgs"
-  fi
-
-  # Shortstat line
-  if [ -n "$shortstat" ]; then
-    local files_n ins_n del_n
-    files_n=$(echo "$shortstat" | grep -oP '\d+ file' | grep -oP '\d+' || echo "0")
-    ins_n=$(echo "$shortstat" | grep -oP '\d+ insertion' | grep -oP '\d+' || echo "0")
-    del_n=$(echo "$shortstat" | grep -oP '\d+ deletion' | grep -oP '\d+' || echo "0")
-
-    printf "    ${box_color}|"; printf '%*s' "$((box_w - 2))" '' | tr ' ' '-'; printf "|${RST}\n"
-    printf "    ${box_color}|${RST} ${DIM}Stats:${RST} ${BWHITE}%s${RST} file(s)  ${BGREEN}+%s${RST}  ${BRED}-%s${RST}%*s${box_color}|${RST}\n" \
-      "$files_n" "$ins_n" "$del_n" "1" ""
-  fi
-
-  # Bottom border
-  printf "    ${box_color}+"; printf '%*s' "$((box_w - 2))" '' | tr ' ' '-'; printf "+${RST}\n"
-  echo ""
 }
 
 # ============================================================================
@@ -590,10 +398,7 @@ print_merge_box() {
 merge_tasks() {
   local tasks=("$@")
   merge_failed=()
-  echo ""
-  hr "-" "$BLUE"
-  log_step "${BBLUE}Merging ${#tasks[@]} branch(es) -> $BASE_BRANCH${RST}"
-  hr "-" "$BLUE"
+  log "Merging ${#tasks[@]} branch(es) -> $BASE_BRANCH"
 
   cd "$REPO_ROOT"
   git checkout "$BASE_BRANCH"
@@ -602,19 +407,20 @@ merge_tasks() {
   for task_id in "${tasks[@]}"; do
     local branch
     branch=$(branch_name "$task_id")
+    local t_title
+    t_title=$(task_title "$task_id")
 
     if ! git rev-parse --verify "$branch" &>/dev/null; then
-      log_task "$task_id" "${YELLOW}Branch $branch not found - skipping merge${RST}"
+      log_task "$task_id" "Branch $branch not found - skipping merge"
       continue
     fi
 
-    log_task "$task_id" "${BLUE}Merging${RST} ${CYAN}$branch${RST} -> ${CYAN}$BASE_BRANCH${RST}"
-
+    local merge_status="clean"
     if git merge --no-ff --no-edit "$branch" 2>&1; then
-      log_task "$task_id" "${BGREEN}Merged cleanly${RST}"
-      print_merge_box "$task_id" "$branch" "clean"
+      :
     else
-      log_task "$task_id" "${BYELLOW}Conflict detected${RST} - analyzing..."
+      merge_status="conflict"
+      log_task "$task_id" "Conflict detected - analyzing..."
 
       # Categorize conflicting files
       local conflicted_files auto_resolvable=() needs_human=()
@@ -633,12 +439,9 @@ merge_tasks() {
 
       if [ ${#needs_human[@]} -gt 0 ]; then
         # Real source conflict — abort merge, mark as failed for retry
-        log_task "$task_id" "${BRED}Source conflict in ${#needs_human[@]} file(s):${RST}"
-        for hf in "${needs_human[@]}"; do
-          log_task "$task_id" "  ${RED}$hf${RST}"
-        done
+        log_task "$task_id" "${RED}Source conflict in ${#needs_human[@]} file(s):${RST} ${needs_human[*]}"
         git merge --abort 2>/dev/null || true
-        log_task "$task_id" "${YELLOW}Merge aborted — task will retry on fresh base${RST}"
+        log_task "$task_id" "Merge aborted — task will retry on fresh base"
         git branch -D "$branch" 2>/dev/null || true
         git push origin --delete "$branch" 2>/dev/null || true
         merge_failed+=("$task_id")
@@ -646,8 +449,6 @@ merge_tasks() {
       fi
 
       # Only auto-resolvable files — safe to resolve
-      log_task "$task_id" "${CYAN}Auto-resolving ${#auto_resolvable[@]} safe file(s)${RST}"
-
       # prd.json: always keep ours (orchestrator manages)
       git checkout --ours prd.json 2>/dev/null || true
 
@@ -659,9 +460,15 @@ merge_tasks() {
 
       git add -A
       git commit --no-edit -m "merge: $task_id with auto-resolved conflicts" || true
-      log_task "$task_id" "${GREEN}Conflict resolved (safe files only)${RST}"
-      print_merge_box "$task_id" "$branch" "conflict"
     fi
+
+    # One-line merge summary
+    local shortstat files_n ins_n del_n
+    shortstat=$(git diff --shortstat HEAD~1 HEAD -- . ':!prd.json' 2>/dev/null || true)
+    files_n=$(echo "$shortstat" | grep -oP '\d+ file' | grep -oP '\d+' || echo "0")
+    ins_n=$(echo "$shortstat" | grep -oP '\d+ insertion' | grep -oP '\d+' || echo "0")
+    del_n=$(echo "$shortstat" | grep -oP '\d+ deletion' | grep -oP '\d+' || echo "0")
+    log_ok "Merged $task_id: $t_title ($files_n files, +$ins_n/-$del_n, $merge_status)"
 
     # Mark done
     mark_done "$task_id"
@@ -683,7 +490,7 @@ merge_tasks() {
   done
 
   git push origin "$BASE_BRANCH" || true
-  log_ok "${GREEN}Pushed to ${CYAN}$BASE_BRANCH${RST}"
+  log_ok "Pushed to $BASE_BRANCH"
 }
 
 # ============================================================================
@@ -692,29 +499,12 @@ merge_tasks() {
 
 total_tasks=$(count_total)
 
-echo ""
-echo -e "${BBLUE}  ____       _       _     ${RST}"
-echo -e "${BBLUE} |  _ \\ __ _| |_ __ | |__  ${RST}"
-echo -e "${BBLUE} | |_) / _\` | | '_ \\| '_ \\ ${RST}"
-echo -e "${BBLUE} |  _ < (_| | | |_) | | | |${RST}"
-echo -e "${BBLUE} |_| \\_\\__,_|_| .__/|_| |_|${RST}"
-echo -e "${BBLUE}              |_|           ${RST}${DIM}Loop Orchestrator${RST}"
-echo ""
-hr "=" "$BBLUE"
-echo -e "  ${BOLD}Parallel:${RST}  ${BCYAN}$PARALLEL${RST} workers"
-echo -e "  ${BOLD}Tool:${RST}      ${BCYAN}claude${RST} (model: ${BCYAN}$MODEL${RST})"
-echo -e "  ${BOLD}PRs:${RST}       $([ "$CREATE_PR" = true ] && echo -e "${BGREEN}enabled${RST}" || echo -e "${YELLOW}disabled${RST}")"
-echo -e "  ${BOLD}Base:${RST}      ${CYAN}$BASE_BRANCH${RST}"
-echo -e "  ${BOLD}Tasks:${RST}     ${BWHITE}$total_tasks${RST} total in PRD"
-echo -e "  ${BOLD}Max iter:${RST}  ${DIM}$MAX_ITERATIONS${RST}"
-echo -e "  ${BOLD}Max retry:${RST} ${DIM}$MAX_RETRIES${RST} per task"
+log "Ralph starting | parallel=$PARALLEL model=$MODEL base=$BASE_BRANCH pr=$CREATE_PR tasks=$total_tasks max_iter=$MAX_ITERATIONS max_retry=$MAX_RETRIES"
 if [ -n "$VALIDATE_CMD" ]; then
-  echo -e "  ${BOLD}Validate:${RST}  ${BGREEN}$VALIDATE_CMD${RST}"
+  log "Validate: $VALIDATE_CMD"
 else
-  echo -e "  ${BOLD}Validate:${RST}  ${YELLOW}disabled${RST} ${DIM}(set VALIDATE_CMD in ralph.config)${RST}"
+  log "Validate: disabled (set VALIDATE_CMD in ralph.config)"
 fi
-hr "=" "$BBLUE"
-echo ""
 
 cd "$REPO_ROOT"
 git checkout "$BASE_BRANCH"
@@ -732,28 +522,17 @@ while [ $iteration -lt $MAX_ITERATIONS ]; do
   completed=$(( total_tasks - pending ))
 
   if [ "$pending" -eq 0 ]; then
-    echo ""
-    hr "=" "$BGREEN"
-    echo -e "  ${BGREEN}ALL TASKS DONE!${RST}  ($iteration iterations used, $(elapsed_since $SCRIPT_START) elapsed)"
-    hr "=" "$BGREEN"
-    echo ""
-    echo -e "  $(progress_bar "$total_tasks" "$total_tasks")"
-    echo ""
+    log_ok "ALL TASKS DONE ($completed/$total_tasks) in $iteration iterations, elapsed $(elapsed_since $SCRIPT_START)"
     gave_up_count=$(jq '[.[] | select(.gave_up == true)] | length' "$FAILED_REPORT")
     if [ "$gave_up_count" -gt 0 ]; then
-      log_warn "${YELLOW}$gave_up_count task(s) had failures (later completed on retry)${RST}"
-      log_info "Full failure history: ${DIM}$FAILED_REPORT${RST}"
+      log_warn "$gave_up_count task(s) had failures (later completed on retry) — see $FAILED_REPORT"
     fi
     rm -rf "$LOCK_DIR"
     exit 0
   fi
 
   batch_num=$(( batch_num + 1 ))
-  echo ""
-  hr "-" "$MAGENTA"
-  echo -e "  ${BMAGENTA}BATCH $batch_num${RST}  ${DIM}|${RST}  ${BWHITE}$pending${RST} pending  ${DIM}|${RST}  ${BWHITE}$completed${RST}/${BWHITE}$total_tasks${RST} done  ${DIM}|${RST}  elapsed: ${DIM}$(elapsed_since $SCRIPT_START)${RST}"
-  echo -e "  $(progress_bar "$completed" "$total_tasks")"
-  hr "-" "$MAGENTA"
+  log "Batch $batch_num | $completed/$total_tasks done | $pending pending | elapsed $(elapsed_since $SCRIPT_START)"
 
   mapfile -t batch < <(get_pending_tasks)
 
@@ -765,12 +544,9 @@ while [ $iteration -lt $MAX_ITERATIONS ]; do
   # Cap to PARALLEL limit
   run_batch=("${batch[@]:0:$PARALLEL}")
 
-  echo ""
-  log_step "${BOLD}Launching ${BCYAN}${#run_batch[@]}${RST}${BOLD} worker(s):${RST}"
   for tid in "${run_batch[@]}"; do
-    echo -e "          ${BMAGENTA}[$tid]${RST} ${DIM}$(task_title "$tid")${RST}"
+    log_task "$tid" "queued: $(task_title "$tid")"
   done
-  echo ""
 
   # Launch workers
   pids=()
@@ -782,33 +558,30 @@ while [ $iteration -lt $MAX_ITERATIONS ]; do
   done
 
   # Wait for all workers
-  start_spinner "Waiting for ${#run_batch[@]} worker(s)..."
   failed=()
   for i in "${!pids[@]}"; do
     if ! wait "${pids[$i]}"; then
       failed+=("${run_batch[$i]}")
     fi
   done
-  stop_spinner
 
-  echo ""
   batch_elapsed=$(elapsed_since "$local_batch_start")
 
   # Report results
   succeeded=$(( ${#run_batch[@]} - ${#failed[@]} ))
   if [ "$succeeded" -gt 0 ]; then
-    log_ok "${BGREEN}$succeeded${RST} task(s) succeeded ${DIM}($batch_elapsed)${RST}"
+    log_ok "$succeeded task(s) succeeded ($batch_elapsed)"
   fi
 
   if [ ${#failed[@]} -gt 0 ]; then
-    log_fail "${BRED}${#failed[@]}${RST} task(s) failed"
+    log_fail "${#failed[@]} task(s) failed"
     for f in "${failed[@]}"; do
       RETRIES[$f]=$(( ${RETRIES[$f]:-0} + 1 ))
       report_failure "$f" "${RETRIES[$f]}" "$MAX_RETRIES"
       if [ "${RETRIES[$f]}" -le "$MAX_RETRIES" ]; then
-        log_task "$f" "${YELLOW}Will retry${RST} (attempt ${BWHITE}${RETRIES[$f]}${RST}/${MAX_RETRIES})"
+        log_task "$f" "will retry (attempt ${RETRIES[$f]}/${MAX_RETRIES})"
       else
-        log_task "$f" "${BRED}GAVE UP${RST} after ${MAX_RETRIES} retries"
+        log_task "$f" "${RED}GAVE UP${RST} after ${MAX_RETRIES} retries"
       fi
     done
   fi
@@ -834,31 +607,23 @@ while [ $iteration -lt $MAX_ITERATIONS ]; do
       RETRIES[$mf]=$(( ${RETRIES[$mf]:-0} + 1 ))
       report_failure "$mf" "${RETRIES[$mf]}" "$MAX_RETRIES"
       if [ "${RETRIES[$mf]}" -le "$MAX_RETRIES" ]; then
-        log_task "$mf" "${YELLOW}Merge conflict — will retry on fresh base${RST} (attempt ${BWHITE}${RETRIES[$mf]}${RST}/${MAX_RETRIES})"
+        log_task "$mf" "merge conflict — will retry on fresh base (attempt ${RETRIES[$mf]}/${MAX_RETRIES})"
       else
-        log_task "$mf" "${BRED}GAVE UP${RST} after ${MAX_RETRIES} retries (merge conflicts)"
+        log_task "$mf" "${RED}GAVE UP${RST} after ${MAX_RETRIES} retries (merge conflicts)"
       fi
     done
   fi
 done
 
-echo ""
-hr "=" "$BRED"
-echo -e "  ${BRED}Reached max iterations ($MAX_ITERATIONS).${RST}  $(count_pending) tasks remaining."
-echo -e "  Elapsed: ${DIM}$(elapsed_since $SCRIPT_START)${RST}"
-hr "=" "$BRED"
+log_fail "Reached max iterations ($MAX_ITERATIONS). $(count_pending) tasks remaining. Elapsed: $(elapsed_since $SCRIPT_START)"
 
 # Final summary
 gave_up_count=$(jq '[.[] | select(.gave_up == true)] | length' "$FAILED_REPORT")
 if [ "$gave_up_count" -gt 0 ]; then
-  echo ""
-  echo -e "  ${BRED}FAILED TASKS: $gave_up_count task(s) gave up${RST}"
-  echo -e "  ${DIM}Details: $FAILED_REPORT${RST}"
-  echo ""
+  log_fail "$gave_up_count task(s) gave up — details: $FAILED_REPORT"
   jq -r '.[] | select(.gave_up == true) | .id + ": " + .title + " (after " + (.attempt|tostring) + " attempts)"' "$FAILED_REPORT" | while read -r line; do
-    echo -e "    ${RED}x${RST} $line"
+    log_fail "  $line"
   done
-  echo ""
 fi
 
 rm -rf "$LOCK_DIR"
