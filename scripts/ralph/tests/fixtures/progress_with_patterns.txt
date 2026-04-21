@@ -1,0 +1,26 @@
+# Ralph Progress Log
+Started: 2025-01-01
+---
+
+## Codebase Patterns
+- Use `sql<number>` template for aggregations
+- Always use `IF NOT EXISTS` for migrations
+- Export types from actions.ts for UI components
+
+## 2025-01-01 10:00 - US-001
+- Added schema
+- Files: db/schema.ts
+- Learnings: migrations need IF NOT EXISTS
+---
+
+## 2025-01-01 11:00 - US-002
+- Added endpoint
+- Files: api/users.ts
+- Learnings: use zod for input validation
+---
+
+## 2025-01-01 12:00 - US-003
+- Added component
+- Files: ui/UserList.tsx
+- Learnings: import types from actions.ts
+---

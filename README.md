@@ -1,8 +1,10 @@
 # Ralph Framework
 
-Autonomous AI coding agent loop for executing projects from PRDs (Product Requirements Documents).
+**Parallel orchestrator for Claude Code.** Reads a PRD with prioritized user stories, spawns autonomous Claude agents in git worktrees, runs validation, and merges results back to the base branch.
 
-Ralph reads a PRD with prioritized user stories, picks one story per iteration, implements it, runs quality checks, commits, and moves to the next. It supports parallel execution with git worktrees.
+> **What this is:** a bash-based agent runner that automates the `pick story → run Claude → validate → merge` loop, with parallel execution, retry-with-feedback, and lazy Playwright for UI stories.
+>
+> **What this isn't:** a framework for building mobile or web applications. Ralph produces no application code of its own — it orchestrates [Claude Code](https://claude.com/claude-code) agents that do. It is a meta-tool, not a runtime.
 
 ## How It Works
 
@@ -98,16 +100,49 @@ The project-local copies are what Ralph's orchestrator actually invokes during a
 
 | Script | Purpose |
 |--------|---------|
-| `ralph.sh` | Parallel orchestrator with git worktrees, auto-merge, retry logic. |
+| `ralph.sh` | Parallel orchestrator with git worktrees, retry logic, and two land-modes (auto-merge or PR-based review). |
 | `init.sh` | Bootstraps ralph into a new project. |
 
-Ralph merges feature branches directly into the base branch and pushes — it does not open pull requests. Code review happens on the base branch post-factum, not per task.
+By default (`--mode merge`) ralph merges feature branches directly into the base branch and pushes. With `--mode pr` it opens a GitHub PR per task instead and stops for human review — see [PR mode](#pr-mode---mode-pr) below.
+
+### Tests
+
+Unit tests for the helper functions (pure functions, PRD parsing, progress
+rotation, `STORIES_FIELD` validation) live in `scripts/ralph/tests/` and use
+[bats-core](https://github.com/bats-core/bats-core):
+
+```bash
+bats scripts/ralph/tests/ralph.bats
+```
+
+See [scripts/ralph/tests/README.md](scripts/ralph/tests/README.md) for details.
 
 ### Parallel execution caveat
 
 `VALIDATE_CMD` runs **per task, in its own worktree, before merge** — not after. With `--parallel 2+`, two tasks can each pass validation in isolation and then be merged into a base branch where their combined changes break the build. Ralph will not re-run validation on the merged state.
 
-If you run with parallelism > 1, treat your base branch's CI (or a manual `VALIDATE_CMD` after a batch) as the real integration gate. For stricter safety, run `--parallel 1` — then per-task validation is also effectively post-merge validation, since tasks merge sequentially.
+If you run with parallelism > 1, treat your base branch's CI (or a manual `VALIDATE_CMD` after a batch) as the real integration gate. For stricter safety, run `--parallel 1` — then per-task validation is also effectively post-merge validation, since tasks merge sequentially. Or use `--mode pr` (below) to gate every batch on human review.
+
+### PR mode (`--mode pr`)
+
+When you want human review before code lands on the base branch, run ralph in PR mode:
+
+```bash
+./scripts/ralph/ralph.sh --mode pr --parallel 2
+```
+
+Instead of auto-merging, ralph:
+
+1. Runs one batch of tasks as usual (Claude implements, validates, pushes the branch).
+2. Opens a GitHub PR per successful task via `gh pr create` against the base branch.
+3. **Exits.** It does not iterate further — the batch is now gated on you.
+4. On the *next* ralph run, it calls `gh pr list --state merged` and marks any stories whose PRs you merged as `passes: true` in `prd.json`, commits that, then picks the next batch.
+
+Requires the [GitHub CLI (`gh`)](https://cli.github.com) to be installed and authenticated.
+
+Tasks whose branches already exist on origin (i.e. a PR is still open) are filtered out of the next batch, so you won't get duplicate PRs or collide with in-flight review.
+
+This is the tightest safety posture ralph supports: every code change is human-reviewed before landing on the base branch, at the cost of needing to invoke ralph once per batch.
 
 ## ralph.sh Options
 
@@ -116,6 +151,7 @@ If you run with parallelism > 1, treat your base branch's CI (or a manual `VALID
 --max-iterations  Max total iterations (default: 50)
 --max-retries N   Max retries per failed task (default: 2)
 --model, -m       Claude model: opus, sonnet, haiku (default: opus)
+--mode            merge | pr (default: merge). See "PR mode" above.
 --base            Base branch (default: current branch)
 ```
 
@@ -165,6 +201,7 @@ scripts/ralph/
   progress.txt          # Cumulative progress log (generated, rotated)
   logs/                 # Per-task execution logs, failed_report.json, last_failure snapshots
   archive/              # Rotated progress.txt snapshots (Codebase Patterns preserved)
+  tests/                # bats unit tests for ralph.sh helpers + fixtures
   skills/
     prd_init/           # New project: questions → prd.json
     prd_append/         # Mid-project: triage bugs/features → append to prd.json

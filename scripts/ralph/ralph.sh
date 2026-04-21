@@ -3,8 +3,10 @@
 # Usage: ./ralph.sh [--parallel N] [--max-iterations N]
 set -euo pipefail
 
-REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Paths are overridable via env vars so the test suite can redirect them to
+# a temp dir before sourcing this file. Production runs get the computed defaults.
+REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 # Load config if exists (can override PRD_DIR, STORIES_FIELD, INSTALL_CMD)
 CONFIG_FILE="$SCRIPT_DIR/ralph.config"
@@ -48,6 +50,7 @@ PARALLEL=2
 MAX_ITERATIONS=50
 MAX_RETRIES=2
 MODEL="opus"  # opus | sonnet | haiku
+MODE="merge"  # merge | pr — pr opens PRs via `gh` instead of auto-merging
 BASE_BRANCH="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")"
 
 # Parse arguments
@@ -57,20 +60,33 @@ while [[ $# -gt 0 ]]; do
     --max-iterations) MAX_ITERATIONS="$2"; shift 2 ;;
     --max-retries)   MAX_RETRIES="$2"; shift 2 ;;
     --model|-m)      MODEL="$2"; shift 2 ;;
+    --mode)          MODE="$2"; shift 2 ;;
     --base)          BASE_BRANCH="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--max-retries N] [--base BRANCH]"
+      echo "Usage: ./ralph.sh [--parallel N] [--max-iterations N] [--max-retries N] [--mode MODE] [--base BRANCH]"
       echo ""
       echo "  --parallel N      Run N tasks in parallel (default: 2)"
       echo "  --max-iterations  Max total iterations (default: 50)"
       echo "  --max-retries N   Max retries per failed task (default: 2)"
       echo "  --model, -m       Claude model: opus, sonnet, haiku (default: opus)"
+      echo "  --mode            merge | pr (default: merge). 'pr' opens GitHub PRs via gh"
+      echo "                    instead of auto-merging, and stops after one batch so a human can review."
       echo "  --base            Base branch (default: current branch)"
       exit 0
       ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
+
+if [[ "$MODE" != "merge" && "$MODE" != "pr" ]]; then
+  echo "Invalid --mode: '$MODE' (must be 'merge' or 'pr')" >&2
+  exit 1
+fi
+
+if [ "$MODE" = "pr" ] && ! command -v gh &>/dev/null; then
+  echo "--mode=pr requires the GitHub CLI (gh). Install from https://cli.github.com" >&2
+  exit 1
+fi
 
 FAILED_REPORT="$LOG_DIR/failed_report.json"
 
@@ -551,12 +567,125 @@ merge_tasks() {
 }
 
 # ============================================================================
+# PR mode: open GitHub PRs instead of merging (human-gated)
+# ============================================================================
+
+# For each successful task, push the branch is already done in run_worker; here
+# we just call `gh pr create` against BASE_BRANCH. Stories stay passes=false
+# until a subsequent ralph invocation detects the PR as merged.
+open_prs() {
+  local tasks=("$@")
+  log "PR mode: opening ${#tasks[@]} PR(s) against $BASE_BRANCH"
+
+  cd "$REPO_ROOT"
+  local opened=0 failed_pr=0
+  for task_id in "${tasks[@]}"; do
+    local branch
+    branch=$(branch_name "$task_id")
+    local t_title
+    t_title=$(task_title "$task_id")
+
+    if ! git ls-remote --exit-code --heads origin "$branch" &>/dev/null; then
+      log_task "$task_id" "branch $branch missing on origin — skipping PR"
+      continue
+    fi
+
+    local story_json story_desc story_criteria
+    story_json=$(jq -r ".${STORIES_FIELD}[] | select(.id == \"$task_id\")" "$PRD" 2>/dev/null)
+    story_desc=$(echo "$story_json" | jq -r '.description // ""')
+    story_criteria=$(echo "$story_json" | jq -r '
+      if .acceptanceCriteria and (.acceptanceCriteria | type) == "array"
+      then .acceptanceCriteria | map("- " + .) | join("\n")
+      else "" end')
+
+    # Body uses printf to avoid shell-expansion surprises from user-authored
+    # story content (backticks, $vars) — safer than a heredoc here.
+    local body
+    body=$(printf 'Story: %s — %s\n\n%s\n\nAcceptance criteria:\n%s\n\n---\nOpened automatically by Ralph. Merge to complete the story; the next ralph run will detect it and mark the story done in prd.json.\n' \
+      "$task_id" "$t_title" "$story_desc" "$story_criteria")
+
+    local pr_url
+    if pr_url=$(gh pr create \
+        --base "$BASE_BRANCH" \
+        --head "$branch" \
+        --title "ralph: $task_id $t_title" \
+        --body "$body" 2>&1); then
+      log_ok "PR opened for $task_id: $pr_url"
+      opened=$(( opened + 1 ))
+    else
+      log_fail "gh pr create failed for $task_id: $pr_url"
+      failed_pr=$(( failed_pr + 1 ))
+    fi
+  done
+
+  log_ok "Opened $opened PR(s)$([ $failed_pr -gt 0 ] && echo " ($failed_pr failed)")"
+}
+
+# Skip tasks that already have their branch on origin — a PR for them is
+# presumably in flight from a previous run. Prevents opening duplicate PRs
+# or re-running work that's waiting on human review.
+filter_in_flight_tasks() {
+  cd "$REPO_ROOT"
+  for tid in "$@"; do
+    local branch
+    branch=$(branch_name "$tid")
+    if git ls-remote --exit-code --heads origin "$branch" &>/dev/null; then
+      log_task "$tid" "skipping: branch exists on origin (PR likely in flight)" >&2
+      continue
+    fi
+    echo "$tid"
+  done
+}
+
+# At the start of a PR-mode run, detect stories whose PRs were merged since
+# last time and mark them done locally. This is how passes=true gets set in
+# PR mode — the reviewer merges the PR, ralph picks it up next run.
+reconcile_merged_prs() {
+  log "PR mode: reconciling merged PRs against prd.json..."
+
+  local merged_branches
+  merged_branches=$(gh pr list --state merged --base "$BASE_BRANCH" --limit 200 \
+    --json headRefName -q '.[].headRefName' 2>/dev/null | grep '^ralph/' || true)
+
+  if [ -z "$merged_branches" ]; then
+    log "No merged ralph PRs found"
+    return 0
+  fi
+
+  local reconciled=0
+  cd "$REPO_ROOT"
+  git checkout "$BASE_BRANCH" >/dev/null 2>&1
+  git pull --rebase origin "$BASE_BRANCH" 2>/dev/null || true
+
+  for tid in $(jq -r ".${STORIES_FIELD}[] | select(.passes == false) | .id" "$PRD" 2>/dev/null); do
+    local branch
+    branch=$(branch_name "$tid")
+    if echo "$merged_branches" | grep -qxF "$branch"; then
+      log_ok "Detected merged PR for $tid — marking done"
+      mark_done "$tid"
+      reconciled=$(( reconciled + 1 ))
+    fi
+  done
+
+  if [ "$reconciled" -gt 0 ]; then
+    git add "$PRD"
+    git commit -m "chore: mark $reconciled story/stories done after PR merge" 2>/dev/null || true
+    git push origin "$BASE_BRANCH" 2>/dev/null || true
+    log_ok "Reconciled $reconciled merged PR(s)"
+  fi
+}
+
+# ============================================================================
 # Main Loop
 # ============================================================================
 
-total_tasks=$(count_total)
+# When sourced by the test suite, stop before the main loop so tests can
+# exercise the helper functions in isolation.
+if [[ "${RALPH_TEST_MODE:-0}" == "1" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
 
-log "Ralph starting | parallel=$PARALLEL model=$MODEL base=$BASE_BRANCH tasks=$total_tasks max_iter=$MAX_ITERATIONS max_retry=$MAX_RETRIES"
+log "Ralph starting | parallel=$PARALLEL model=$MODEL mode=$MODE base=$BASE_BRANCH max_iter=$MAX_ITERATIONS max_retry=$MAX_RETRIES"
 if [ -n "$VALIDATE_CMD" ]; then
   log "Validate: $VALIDATE_CMD"
 else
@@ -566,6 +695,16 @@ fi
 cd "$REPO_ROOT"
 git checkout "$BASE_BRANCH"
 git pull --rebase origin "$BASE_BRANCH" 2>/dev/null || true
+
+# In PR mode, pick up stories whose PRs got merged since last run before we
+# count totals or pick tasks. This is the closest we get to "sync".
+if [ "$MODE" = "pr" ]; then
+  reconcile_merged_prs
+  cache_task_titles
+fi
+
+total_tasks=$(count_total)
+log "Tasks: $total_tasks total"
 
 # Ensure lock directory exists (flock uses file-based locks, no stale lock cleanup needed)
 touch "$GIT_LOCK_FILE" 2>/dev/null || true
@@ -594,8 +733,19 @@ while [ $iteration -lt $MAX_ITERATIONS ]; do
 
   mapfile -t batch < <(get_pending_tasks)
 
+  # In PR mode, drop tasks whose branches already exist on origin — those
+  # have open PRs waiting for review, so running them again would either
+  # conflict or produce a duplicate PR.
+  if [ "$MODE" = "pr" ] && [ ${#batch[@]} -gt 0 ]; then
+    mapfile -t batch < <(filter_in_flight_tasks "${batch[@]}")
+  fi
+
   if [ ${#batch[@]} -eq 0 ]; then
-    log_warn "No pending tasks found (all exhausted retries?)"
+    if [ "$MODE" = "pr" ]; then
+      log_warn "No pending tasks to run (all either in-flight or retry-exhausted). Merge open PRs and re-run."
+    else
+      log_warn "No pending tasks found (all exhausted retries?)"
+    fi
     exit 0
   fi
 
@@ -656,8 +806,15 @@ while [ $iteration -lt $MAX_ITERATIONS ]; do
     fi
   done
 
-  # Merge successful tasks
+  # Merge or open PRs for successful tasks
   if [ ${#merge_list[@]} -gt 0 ]; then
+    if [ "$MODE" = "pr" ]; then
+      open_prs "${merge_list[@]}"
+      log_ok "PR mode: one batch complete. Review and merge the PRs, then re-run ralph."
+      rm -rf "$LOCK_DIR"
+      exit 0
+    fi
+
     merge_tasks "${merge_list[@]}"
 
     # Handle tasks that failed during merge (source conflicts)

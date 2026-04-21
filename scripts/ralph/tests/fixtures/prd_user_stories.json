@@ -1,0 +1,17 @@
+{
+  "project": "Legacy Field Test",
+  "branchName": "ralph/legacy",
+  "description": "Fixture using the legacy userStories field name",
+  "userStories": [
+    {
+      "id": "US-A",
+      "title": "Legacy format story",
+      "description": "Exists to test STORIES_FIELD auto-detection",
+      "acceptanceCriteria": ["Detected correctly"],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "tags": []
+    }
+  ]
+}

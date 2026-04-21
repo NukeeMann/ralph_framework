@@ -1,0 +1,47 @@
+{
+  "project": "Test Project",
+  "branchName": "ralph/test-feature",
+  "description": "Fixture PRD for unit tests",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Add database schema",
+      "description": "Schema first",
+      "acceptanceCriteria": ["Migration runs"],
+      "priority": 1,
+      "passes": true,
+      "notes": "",
+      "tags": []
+    },
+    {
+      "id": "US-002",
+      "title": "Add API endpoint",
+      "description": "Backend logic",
+      "acceptanceCriteria": ["Endpoint returns 200"],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "tags": []
+    },
+    {
+      "id": "US-003",
+      "title": "Add UI component",
+      "description": "Frontend",
+      "acceptanceCriteria": ["Component renders"],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "tags": ["ui"]
+    },
+    {
+      "id": "US-004",
+      "title": "Dashboard aggregate",
+      "description": "Aggregates",
+      "acceptanceCriteria": ["Totals correct"],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "tags": []
+    }
+  ]
+}
