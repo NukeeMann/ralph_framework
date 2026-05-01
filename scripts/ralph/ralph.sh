@@ -21,6 +21,7 @@ if [ -f "$CONFIG_FILE" ]; then
 fi
 
 PRD="$PRD_DIR/prd.json"
+PRD_REL="${PRD#$REPO_ROOT/}"
 WORKTREE_BASE="$REPO_ROOT/.worktrees"
 LOG_DIR="$SCRIPT_DIR/logs"
 LOCK_DIR="$REPO_ROOT/.ralph-locks"
@@ -547,7 +548,7 @@ merge_tasks() {
       while IFS= read -r cf; do
         [ -z "$cf" ] && continue
         case "$cf" in
-          prd.json)                   auto_resolvable+=("$cf") ;;
+          "$PRD_REL")                 auto_resolvable+=("$cf") ;;
           package-lock.json)          auto_resolvable+=("$cf") ;;
           *.lock)                     auto_resolvable+=("$cf") ;;
           .gitignore)                 auto_resolvable+=("$cf") ;;
@@ -570,11 +571,11 @@ merge_tasks() {
       # prd.json: agents must not edit it. A conflict here means the
       # orchestrator updated mark_done on base between when this branch
       # was cut and when it's merging — keep ours unconditionally.
-      git checkout --ours prd.json 2>/dev/null || true
+      git checkout --ours "$PRD_REL" 2>/dev/null || true
 
       # Lock files / generated files: accept theirs
       for af in "${auto_resolvable[@]}"; do
-        [ "$af" = "prd.json" ] && continue
+        [ "$af" = "$PRD_REL" ] && continue
         git checkout --theirs "$af" 2>/dev/null || true
       done
 
@@ -584,16 +585,14 @@ merge_tasks() {
 
     # One-line merge summary
     local shortstat files_n ins_n del_n
-    shortstat=$(git diff --shortstat HEAD~1 HEAD -- . ':!prd.json' 2>/dev/null || true)
+    shortstat=$(git diff --shortstat HEAD~1 HEAD -- . ":!$PRD_REL" 2>/dev/null || true)
     files_n=$(echo "$shortstat" | grep -oP '\d+ file' | grep -oP '\d+' || echo "0")
     ins_n=$(echo "$shortstat" | grep -oP '\d+ insertion' | grep -oP '\d+' || echo "0")
     del_n=$(echo "$shortstat" | grep -oP '\d+ deletion' | grep -oP '\d+' || echo "0")
     log_ok "Merged $task_id: $t_title ($files_n files, +$ins_n/-$del_n, $merge_status)"
 
-    # Mark done
+    # Mark done. prd.json is local ralph state (gitignored) — never staged.
     mark_done "$task_id"
-    git add prd.json
-    git commit -m "chore: mark $task_id done" 2>/dev/null || true
 
     # Cleanup branch
     git branch -D "$branch" 2>/dev/null || true
@@ -706,9 +705,6 @@ reconcile_merged_prs() {
   done
 
   if [ "$reconciled" -gt 0 ]; then
-    git add "$PRD"
-    git commit -m "chore: mark $reconciled story/stories done after PR merge" 2>/dev/null || true
-    git push origin "$BASE_BRANCH" 2>/dev/null || true
     log_ok "Reconciled $reconciled merged PR(s)"
   fi
 }
